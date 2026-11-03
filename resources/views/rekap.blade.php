@@ -166,6 +166,9 @@
                                 @endif
                                 <td class="px-3 py-2 whitespace-nowrap">
                                     {{ $namaSumber[$sumberId] ?? '?' }}
+                                    @if ($nomorSumber[$sumberId] ?? null)
+                                        <span class="block text-xs text-gray-500">{{ $nomorSumber[$sumberId] }}</span>
+                                    @endif
                                 </td>
                                 @foreach ($recipients as $recipient)
                                     @php $nilai = $matrix[$key][$sumberId][$recipient->id] ?? null; @endphp

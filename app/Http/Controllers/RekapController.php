@@ -146,6 +146,7 @@ class RekapController extends Controller
             'dates' => $dates,
             'recipients' => $recipients,
             'namaSumber' => SourceAccount::pluck('nama', 'id'),
+            'nomorSumber' => SourceAccount::pluck('nomor_rekening', 'id'),
             'matrix' => $matrix,
             'sumberPerTanggal' => $sumberPerTanggal,
             'totalPerSumber' => $totalPerSumber,

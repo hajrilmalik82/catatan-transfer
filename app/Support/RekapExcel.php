@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -188,7 +189,8 @@ class RekapExcel
                         $this->sheet->setCellValue('A'.$baris, $tanggal->translatedFormat('d M Y'));
                     }
 
-                    $this->sheet->setCellValue('B'.$baris, $this->data['namaSumber'][$sumberId] ?? '?');
+                    $this->sheet->setCellValue('B'.$baris, $this->labelSumber($sumberId));
+                    $this->sheet->getStyle('B'.$baris)->getAlignment()->setWrapText(true);
 
                     $kolom = 3;
 
@@ -226,6 +228,26 @@ class RekapExcel
         }
 
         return $baris;
+    }
+
+    /**
+     * Nama rekening sumber dengan nomornya di baris kedua, ditulis lebih kecil
+     * dan abu-abu seperti perlakuan pada kepala kolom penerima.
+     */
+    private function labelSumber(int $sumberId): RichText|string
+    {
+        $nama = $this->data['namaSumber'][$sumberId] ?? '?';
+        $nomor = $this->data['nomorSumber'][$sumberId] ?? null;
+
+        if (! $nomor) {
+            return $nama;
+        }
+
+        $teks = new RichText();
+        $teks->createText($nama."\n");
+        $teks->createTextRun($nomor)->getFont()->setSize(8)->getColor()->setARGB('FF6B7280');
+
+        return $teks;
     }
 
     private function tulisTotal(int $baris): void
@@ -268,7 +290,7 @@ class RekapExcel
     private function rapikanKolom(): void
     {
         $this->sheet->getColumnDimension('A')->setWidth(14);
-        $this->sheet->getColumnDimension('B')->setWidth(24);
+        $this->sheet->getColumnDimension('B')->setWidth(28);
 
         $kolom = 3;
 
