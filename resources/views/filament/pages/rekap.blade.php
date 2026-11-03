@@ -1,8 +1,4 @@
 <x-filament-panels::page>
-    @php
-        $pintas = ['minggu' => 'Per minggu', 'bulan' => '1 bulan terakhir', 'tahun' => '1 tahun terakhir'];
-    @endphp
-
     <style>
         .rk { --rk-bg: #fff; --rk-garis: #e5e7eb; --rk-teks: #111827; --rk-redup: #6b7280;
               --rk-kepala: #f9fafb; --rk-total: #dbeafe; --rk-kosong: #d1d5db; }
@@ -48,23 +44,14 @@
     </style>
 
     <div class="rk">
-        <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem">
-            @foreach ($pintas as $kunci => $label)
-                <a href="{{ \App\Filament\Pages\Rekap::getUrl(['rentang' => $kunci]) }}"
-                   class="rk-chip {{ $rentang === $kunci ? 'rk-chip--aktif' : '' }}">{{ $label }}</a>
-            @endforeach
-        </div>
-
-        @if ($rentang === 'minggu' && $senin)
             @php
                 $sebelum = $senin->copy()->subWeek();
                 $sesudah = $senin->copy()->addWeek();
             @endphp
             <div class="rk-bar">
-                <a class="rk-tombol" href="{{ \App\Filament\Pages\Rekap::getUrl(['rentang' => 'minggu', 'minggu' => $sebelum->toDateString()]) }}">&larr; Minggu sebelumnya</a>
+                <a class="rk-tombol" href="{{ \App\Filament\Pages\Rekap::getUrl(['minggu' => $sebelum->toDateString()]) }}">&larr; Minggu sebelumnya</a>
 
                 <form method="GET" style="display:flex; gap:.5rem; align-items:center">
-                    <input type="hidden" name="rentang" value="minggu">
                     <select name="minggu" class="rk-input" onchange="this.form.submit()">
                         @foreach ($pilihanMinggu as $pilihan)
                             <option value="{{ $pilihan->toDateString() }}" @selected($pilihan->toDateString() === $senin->toDateString())>
@@ -76,12 +63,11 @@
                 </form>
 
                 @if ($sesudah->lte($mingguIni))
-                    <a class="rk-tombol" href="{{ \App\Filament\Pages\Rekap::getUrl(['rentang' => 'minggu', 'minggu' => $sesudah->toDateString()]) }}">Minggu berikutnya &rarr;</a>
+                    <a class="rk-tombol" href="{{ \App\Filament\Pages\Rekap::getUrl(['minggu' => $sesudah->toDateString()]) }}">Minggu berikutnya &rarr;</a>
                 @else
                     <span class="rk-tombol rk-tombol--mati">Minggu berikutnya &rarr;</span>
                 @endif
             </div>
-        @endif
 
         <form method="GET" class="rk-bar">
             <div>
@@ -93,12 +79,15 @@
                 <input class="rk-input" id="sampai" type="date" name="sampai" value="{{ $sampai->toDateString() }}">
             </div>
             <button type="submit" class="rk-aksi rk-aksi--biru">Tampilkan</button>
-            <a class="rk-aksi rk-aksi--hijau" href="{{ route('rekap.export', request()->only('dari', 'sampai', 'rentang', 'minggu')) }}">Export Excel</a>
+            <a class="rk-aksi rk-aksi--hijau" href="{{ route('rekap.export', request()->only('dari', 'sampai', 'minggu')) }}">Export Excel</a>
         </form>
 
         <p class="rk-ket">
             Menampilkan {{ $dari->translatedFormat('l, d M Y') }} sampai {{ $sampai->translatedFormat('l, d M Y') }}.
             @if ($ringkas) Rentangnya panjang, jadi hanya tanggal yang ada transaksinya yang ditampilkan. @endif
+            @if ($manual)
+                <a href="{{ \App\Filament\Pages\Rekap::getUrl() }}" style="color:#2563eb">Kembali ke tampilan mingguan</a>
+            @endif
         </p>
 
         <dl class="rk-kartu">
@@ -181,7 +170,8 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td class="rk-beku" colspan="2">TOTAL PER ORANG</td>
+                            <td class="rk-beku">TOTAL PER ORANG</td>
+                            <td></td>
                             @foreach ($recipients as $penerima)
                                 <td class="rk-kanan">{{ number_format($recipientTotals[$penerima->id] ?? 0, 0, ',', '.') }}</td>
                             @endforeach

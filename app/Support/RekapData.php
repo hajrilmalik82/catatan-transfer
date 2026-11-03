@@ -21,45 +21,33 @@ class RekapData
      */
     public function build(Request $request): array
     {
-        // Tanggal yang diisi manual selalu menang. Tanpa itu, dipakai rentang
-        // pintas yang dipilih, dan tanpa itu juga, minggu berjalan.
-        $rentang = $request->input('rentang', 'minggu');
-        $sampai = now()->startOfDay();
-        $senin = null;
+        // Tampilannya selalu per minggu kalender Senin sampai Minggu. Filter
+        // tanggal manual menimpa rentangnya, tapi navigasi mingguan tetap ada.
+        $manual = $request->filled('dari') || $request->filled('sampai');
 
-        if ($rentang === 'minggu') {
-            // Minggu kalender Senin sampai Minggu, bukan tujuh hari ke belakang,
-            // supaya rekapnya sejajar dengan cara orang membaca kalender.
-            $senin = $request->filled('minggu')
-                ? Carbon::parse($request->input('minggu'))->startOfWeek(Carbon::MONDAY)
-                : now()->startOfWeek(Carbon::MONDAY);
+        $senin = match (true) {
+            $request->filled('minggu') => Carbon::parse($request->input('minggu'))->startOfWeek(Carbon::MONDAY),
+            $request->filled('dari') => Carbon::parse($request->input('dari'))->startOfWeek(Carbon::MONDAY),
+            default => now()->startOfWeek(Carbon::MONDAY),
+        };
 
-            $dari = $senin->copy();
-            $sampai = $senin->copy()->addDays(6);
-        } else {
-            $dari = match ($rentang) {
-                'tahun' => now()->subYear()->startOfDay(),
-                'bulan' => now()->subMonth()->startOfDay(),
-                default => now()->subDays(6)->startOfDay(),
-            };
-        }
+        $dari = $request->filled('dari')
+            ? Carbon::parse($request->input('dari'))->startOfDay()
+            : $senin->copy();
 
-        if ($request->filled('dari')) {
-            $dari = Carbon::parse($request->input('dari'))->startOfDay();
-            $rentang = null;
-        }
-
-        if ($request->filled('sampai')) {
-            $sampai = Carbon::parse($request->input('sampai'))->startOfDay();
-            $rentang = null;
-        }
+        $sampai = $request->filled('sampai')
+            ? Carbon::parse($request->input('sampai'))->startOfDay()
+            : ($manual ? $dari->copy() : $senin->copy()->addDays(6));
 
         if ($sampai->lt($dari)) {
             [$dari, $sampai] = [$sampai, $dari];
         }
 
         $rows = Transaction::query()
-            ->whereBetween('tanggal', [$dari->toDateString(), $sampai->toDateString()])
+            // Kolom tanggal ikut menyimpan jam, jadi perbandingannya memakai
+            // whereDate; kalau tidak, transaksi di hari terakhir rentang luput.
+            ->whereDate('tanggal', '>=', $dari->toDateString())
+            ->whereDate('tanggal', '<=', $sampai->toDateString())
             ->selectRaw('tanggal, source_account_id, recipient_id, SUM(nominal_transfer) as total')
             ->groupBy('tanggal', 'source_account_id', 'recipient_id')
             ->get();
@@ -121,7 +109,7 @@ class RekapData
         }
 
         return [
-            'rentang' => $rentang,
+            'manual' => $manual,
             'senin' => $senin,
             'pilihanMinggu' => $pilihanMinggu,
             'mingguIni' => now()->startOfWeek(Carbon::MONDAY),

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Import Bukti Transfer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('pwa-head')
 </head>
 <body class="bg-gray-100 text-gray-900">
 <div class="mx-auto max-w-2xl p-4 sm:p-6">

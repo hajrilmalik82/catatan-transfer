@@ -254,8 +254,8 @@ class RekapExcel
     {
         $akhir = $this->kolomTerakhir();
 
+        // Hanya sejajar kolom Tanggal; kolom Transaksi dibiarkan kosong.
         $this->sheet->setCellValue('A'.$baris, 'TOTAL PER ORANG');
-        $this->sheet->mergeCells('A'.$baris.':B'.$baris);
 
         $kolom = 3;
 

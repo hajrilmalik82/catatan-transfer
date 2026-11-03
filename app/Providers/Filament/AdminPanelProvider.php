@@ -7,6 +7,8 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use App\Http\Middleware\DashboardKeRekap;
+use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
 use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -20,6 +22,21 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
+    public function boot(): void
+    {
+        // Menyisipkan manifest dan pendaftaran service worker ke <head> panel,
+        // supaya aplikasinya bisa dipasang ke layar utama ponsel.
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::HEAD_END,
+            fn (): string => view('pwa-head')->render(),
+        );
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+            fn (): string => view('pwa-install')->render(),
+        );
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel
