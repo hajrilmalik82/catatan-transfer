@@ -7,8 +7,11 @@
         Pasang aplikasi di ponsel
     </button>
     <p id="pwa-petunjuk" style="display:none; margin:.75rem 0 0; font-size:.75rem; line-height:1.5; color:#6b7280">
-        Buka lewat Safari, ketuk tombol <strong>Bagikan</strong> di bawah, lalu pilih
-        <strong>Add to Home Screen</strong>.
+        Untuk memasang: ketuk tombol <strong>Bagikan</strong> di bilah bawah, gulir,
+        lalu pilih <strong>Add to Home Screen</strong>.
+        <br>
+        <span style="opacity:.75">Harus lewat Safari. Lewat Chrome atau browser di dalam
+        aplikasi lain, menu itu tidak tersedia.</span>
     </p>
 </div>
 
@@ -22,7 +25,11 @@
     const terpasang = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
     if (terpasang) return;
 
-    const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    // iPadOS 13+ menyebut dirinya Macintosh di Safari, jadi dibedakan lewat
+    // keberadaan layar sentuh.
+    const ua = navigator.userAgent;
+    const iOS = /iphone|ipad|ipod/i.test(ua)
+        || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
 
     if (iOS) {
         kotak.style.display = 'block';

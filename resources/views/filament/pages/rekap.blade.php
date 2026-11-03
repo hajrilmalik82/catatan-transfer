@@ -79,7 +79,8 @@
                 <input class="rk-input" id="sampai" type="date" name="sampai" value="{{ $sampai->toDateString() }}">
             </div>
             <button type="submit" class="rk-aksi rk-aksi--biru">Tampilkan</button>
-            <a class="rk-aksi rk-aksi--hijau" href="{{ route('rekap.export', request()->only('dari', 'sampai', 'minggu')) }}">Export Excel</a>
+            <a class="rk-aksi rk-aksi--hijau" target="_blank" rel="noopener"
+               href="{{ route('rekap.export', request()->only('dari', 'sampai', 'minggu')) }}">Export Excel</a>
         </form>
 
         <p class="rk-ket">

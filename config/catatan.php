@@ -20,5 +20,25 @@ return [
         'BTN' => 'BTN',
         'Lainnya' => 'Lainnya',
     ],
+    /*
+    |--------------------------------------------------------------------------
+    | Menu dan hak akses
+    |--------------------------------------------------------------------------
+    | Dipakai untuk menyusun form hak akses pengguna dan memeriksanya.
+    | Kuncinya disimpan apa adanya di kolom permissions.
+    */
+    'menu' => [
+        'rekap' => ['label' => 'Rekap', 'aksi' => ['lihat']],
+        'import' => ['label' => 'Import Bukti Transfer', 'aksi' => ['lihat']],
+        'transaksi' => ['label' => 'Transaksi', 'aksi' => ['lihat', 'tambah', 'ubah', 'hapus']],
+        'penerima' => ['label' => 'Penerima', 'aksi' => ['lihat', 'tambah', 'ubah', 'hapus']],
+        'rekening_sumber' => ['label' => 'Rekening Sumber', 'aksi' => ['lihat', 'tambah', 'ubah', 'hapus']],
+    ],
 
+    'label_aksi' => [
+        'lihat' => 'Lihat',
+        'tambah' => 'Tambah',
+        'ubah' => 'Ubah',
+        'hapus' => 'Hapus',
+    ],
 ];

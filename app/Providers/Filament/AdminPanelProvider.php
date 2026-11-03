@@ -6,7 +6,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use App\Http\Middleware\DashboardKeRekap;
+use App\Http\Middleware\BatasiPanel;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Filament\Navigation\NavigationItem;
@@ -58,10 +58,11 @@ class AdminPanelProvider extends PanelProvider
                 NavigationItem::make('Import Bukti Transfer')
                     ->url('/import')
                     ->icon('heroicon-o-arrow-up-tray')
+                    ->visible(fn (): bool => auth()->user()?->bolehAkses('import') ?? false)
                     ->sort(2),
             ])
             ->middleware([
-                DashboardKeRekap::class,
+                BatasiPanel::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,

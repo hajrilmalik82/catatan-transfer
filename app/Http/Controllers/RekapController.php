@@ -18,6 +18,11 @@ class RekapController extends Controller
 
         (new RekapExcel($data))->simpanKe($path);
 
-        return response()->download($path, $nama)->deleteFileAfterSend();
+        // Tipe dan nama berkas dinyatakan tegas. Safari di iOS kadang keliru
+        // menebaknya dan membuka berkas sebagai teks alih-alih mengunduh.
+        return response()->download($path, $nama, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$nama.'"',
+        ])->deleteFileAfterSend();
     }
 }

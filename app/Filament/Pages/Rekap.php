@@ -18,6 +18,16 @@ class Rekap extends Page
 
     protected static ?int $navigationSort = 1;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->bolehAkses('rekap') ?? false;
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()?->bolehAkses('rekap') ?? false;
+    }
+
     protected function getViewData(): array
     {
         return app(RekapData::class)->build(request());

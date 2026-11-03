@@ -19,6 +19,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 
 class TransactionResource extends Resource
@@ -34,6 +35,43 @@ class TransactionResource extends Resource
     protected static ?string $pluralModelLabel = 'Transaksi';
 
     protected static ?int $navigationSort = 1;
+
+    private const MENU = 'transaksi';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU) ?? false;
+    }
+
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU) ?? false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'lihat') ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'tambah') ?? false;
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'ubah') ?? false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'hapus') ?? false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'hapus') ?? false;
+    }
 
     public static function form(Schema $schema): Schema
     {

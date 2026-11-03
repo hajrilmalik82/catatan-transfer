@@ -17,6 +17,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 class RecipientResource extends Resource
@@ -36,6 +37,43 @@ class RecipientResource extends Resource
     protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'nama';
+
+    private const MENU = 'penerima';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU) ?? false;
+    }
+
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU) ?? false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'lihat') ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'tambah') ?? false;
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'ubah') ?? false;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'hapus') ?? false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->bolehAkses(self::MENU, 'hapus') ?? false;
+    }
 
     public static function form(Schema $schema): Schema
     {
