@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Di belakang tunnel atau reverse proxy, header inilah yang memberi
+        // tahu Laravel bahwa pengunjung datang lewat HTTPS. Tanpa ini, alamat
+        // aset digenerate sebagai http dan diblokir browser.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

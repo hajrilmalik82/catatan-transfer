@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Recipient;
 use App\Models\SourceAccount;
 use App\Models\Transaction;
+use App\Support\RekapExcel;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class RekapController extends Controller
 {
@@ -16,67 +17,16 @@ class RekapController extends Controller
         return view('rekap', $this->buildPivot($request));
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): BinaryFileResponse
     {
         $data = $this->buildPivot($request);
 
-        $filename = 'rekap-transfer-'.$data['dari']->format('Ymd').'-'.$data['sampai']->format('Ymd').'.csv';
+        $nama = 'rekap-transfer-'.$data['dari']->format('Ymd').'-'.$data['sampai']->format('Ymd').'.xlsx';
+        $path = storage_path('app/'.$nama);
 
-        return response()->streamDownload(function () use ($data) {
-            $out = fopen('php://output', 'w');
+        (new RekapExcel($data))->simpanKe($path);
 
-            // BOM supaya Excel membaca UTF-8 dengan benar.
-            fwrite($out, "\xEF\xBB\xBF");
-
-            $header = ['Tanggal', 'Transaksi'];
-            foreach ($data['recipients'] as $recipient) {
-                $header[] = $recipient->nama;
-            }
-            $header[] = 'Total per Transaksi';
-            $header[] = 'Total Harian';
-            fputcsv($out, $header);
-
-            foreach ($data['dates'] as $date) {
-                $key = $date->toDateString();
-                $sumberHariIni = $data['sumberPerTanggal'][$key] ?? [];
-
-                if ($sumberHariIni === []) {
-                    fputcsv($out, array_merge(
-                        [$date->format('Y-m-d'), ''],
-                        array_fill(0, $data['recipients']->count(), 0),
-                        [0, 0]
-                    ));
-
-                    continue;
-                }
-
-                $pertama = true;
-
-                foreach ($sumberHariIni as $sumberId) {
-                    $row = [$date->format('Y-m-d'), $data['namaSumber'][$sumberId] ?? '?'];
-
-                    foreach ($data['recipients'] as $recipient) {
-                        $row[] = $data['matrix'][$key][$sumberId][$recipient->id] ?? 0;
-                    }
-
-                    $row[] = $data['totalPerSumber'][$key][$sumberId] ?? 0;
-                    $row[] = $pertama ? ($data['dailyTotals'][$key] ?? 0) : '';
-                    fputcsv($out, $row);
-
-                    $pertama = false;
-                }
-            }
-
-            $footer = ['TOTAL PER ORANG', ''];
-            foreach ($data['recipients'] as $recipient) {
-                $footer[] = $data['recipientTotals'][$recipient->id] ?? 0;
-            }
-            $footer[] = $data['grandTotal'];
-            $footer[] = $data['grandTotal'];
-            fputcsv($out, $footer);
-
-            fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return response()->download($path, $nama)->deleteFileAfterSend();
     }
 
     /**
