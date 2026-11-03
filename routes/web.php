@@ -11,7 +11,6 @@ Route::redirect('/', '/admin');
 Route::get('/login', fn () => redirect('/admin/login'))->name('login');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/rekap', [RekapController::class, 'index'])->name('rekap');
     Route::get('/rekap/export', [RekapController::class, 'export'])->name('rekap.export');
 
     Route::get('/import', [ImportController::class, 'form'])->name('import');
