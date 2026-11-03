@@ -79,7 +79,7 @@
                 <input class="rk-input" id="sampai" type="date" name="sampai" value="{{ $sampai->toDateString() }}">
             </div>
             <button type="submit" class="rk-aksi rk-aksi--biru">Tampilkan</button>
-            <a class="rk-aksi rk-aksi--hijau" target="_blank" rel="noopener"
+            <a class="rk-aksi rk-aksi--hijau" id="rk-export" target="_blank" rel="noopener"
                href="{{ route('rekap.export', request()->only('dari', 'sampai', 'minggu')) }}">Export Excel</a>
         </form>
 
@@ -184,4 +184,67 @@
             </div>
         @endif
     </div>
+
+    <script>
+    (() => {
+        const tombol = document.getElementById('rk-export');
+        if (! tombol) return;
+
+        // Di browser biasa, unduhan lewat tautan sudah jalan sebagaimana mestinya.
+        const layarPenuh = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+        if (! layarPenuh) return;
+
+        // Mode aplikasi layar penuh di iOS tidak punya pengelola unduhan, jadi
+        // berkasnya diambil sendiri lalu diserahkan ke lembar Bagikan.
+        tombol.removeAttribute('target');
+
+        const namaDari = (header) => {
+            const cocok = (header || '').match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+            return cocok ? decodeURIComponent(cocok[1]) : 'rekap-transfer.xlsx';
+        };
+
+        tombol.addEventListener('click', async (e) => {
+            e.preventDefault();
+
+            const semula = tombol.textContent;
+            tombol.textContent = 'Menyiapkan…';
+            tombol.style.pointerEvents = 'none';
+
+            try {
+                const res = await fetch(tombol.href, { credentials: 'same-origin' });
+                if (! res.ok) throw new Error('server membalas ' + res.status);
+
+                const blob = await res.blob();
+                const nama = namaDari(res.headers.get('Content-Disposition'));
+                const berkas = new File([blob], nama, { type: blob.type });
+
+                if (navigator.canShare?.({ files: [berkas] })) {
+                    try {
+                        await navigator.share({ files: [berkas], title: nama });
+                        return;
+                    } catch (err) {
+                        // Dibatalkan pengguna, tidak perlu dianggap gagal.
+                        if (err.name === 'AbortError') return;
+                    }
+                }
+
+                // Jalan cadangan: unduh lewat alamat blob.
+                const alamat = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = alamat;
+                a.download = nama;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(alamat), 30000);
+            } catch (err) {
+                alert('Gagal menyiapkan berkas: ' + err.message
+                    + '\n\nSebagai gantinya, buka halaman ini lewat Safari lalu unduh dari sana.');
+            } finally {
+                tombol.textContent = semula;
+                tombol.style.pointerEvents = '';
+            }
+        });
+    })();
+    </script>
 </x-filament-panels::page>
