@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SourceAccount extends Model
 {
-    protected $fillable = ['nama', 'aktif'];
+    protected $fillable = ['nama', 'nomor_rekening', 'aktif'];
 
     protected $casts = [
         'aktif' => 'boolean',

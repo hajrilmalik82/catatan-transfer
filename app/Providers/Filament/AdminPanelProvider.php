@@ -41,10 +41,14 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
             ])
             ->navigationItems([
+                NavigationItem::make('Import Bukti Transfer')
+                    ->url('/import')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->sort(2),
                 NavigationItem::make('Rekap')
                     ->url('/rekap')
                     ->icon('heroicon-o-table-cells')
-                    ->sort(2),
+                    ->sort(3),
             ])
             ->middleware([
                 EncryptCookies::class,

@@ -44,6 +44,12 @@ class SourceAccountResource extends Resource
                 ->unique(ignoreRecord: true)
                 ->maxLength(255),
 
+            TextInput::make('nomor_rekening')
+                ->label('Nomor Rekening')
+                ->helperText('Dipakai untuk mencocokkan bukti transfer saat import. Lihat baris "Sumber Dana" atau "Source of Fund" di PDF.')
+                ->unique(ignoreRecord: true)
+                ->maxLength(50),
+
             Toggle::make('aktif')
                 ->label('Aktif')
                 ->helperText('Nonaktifkan kalau sudah tidak dipakai. Data lama tetap tersimpan.')
@@ -56,6 +62,10 @@ class SourceAccountResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('nama')->label('Nama')->searchable()->sortable(),
+                TextColumn::make('nomor_rekening')
+                    ->label('No. Rekening')
+                    ->placeholder('belum diisi')
+                    ->searchable(),
                 TextColumn::make('transactions_count')
                     ->label('Jumlah Transaksi')
                     ->counts('transactions'),

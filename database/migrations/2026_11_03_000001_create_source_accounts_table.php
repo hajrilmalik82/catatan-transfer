@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('source_accounts', function (Blueprint $table) {
             $table->id();
             $table->string('nama')->unique();
+            $table->string('nomor_rekening')->nullable()->unique();
             $table->boolean('aktif')->default(true);
             $table->timestamps();
         });

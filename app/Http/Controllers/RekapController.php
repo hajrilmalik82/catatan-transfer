@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Recipient;
+use App\Models\SourceAccount;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -27,27 +28,50 @@ class RekapController extends Controller
             // BOM supaya Excel membaca UTF-8 dengan benar.
             fwrite($out, "\xEF\xBB\xBF");
 
-            $header = ['Tanggal'];
+            $header = ['Tanggal', 'Transaksi'];
             foreach ($data['recipients'] as $recipient) {
                 $header[] = $recipient->nama;
             }
+            $header[] = 'Total per Transaksi';
             $header[] = 'Total Harian';
             fputcsv($out, $header);
 
             foreach ($data['dates'] as $date) {
                 $key = $date->toDateString();
-                $row = [$date->format('Y-m-d')];
-                foreach ($data['recipients'] as $recipient) {
-                    $row[] = $data['matrix'][$key][$recipient->id] ?? 0;
+                $sumberHariIni = $data['sumberPerTanggal'][$key] ?? [];
+
+                if ($sumberHariIni === []) {
+                    fputcsv($out, array_merge(
+                        [$date->format('Y-m-d'), ''],
+                        array_fill(0, $data['recipients']->count(), 0),
+                        [0, 0]
+                    ));
+
+                    continue;
                 }
-                $row[] = $data['dailyTotals'][$key] ?? 0;
-                fputcsv($out, $row);
+
+                $pertama = true;
+
+                foreach ($sumberHariIni as $sumberId) {
+                    $row = [$date->format('Y-m-d'), $data['namaSumber'][$sumberId] ?? '?'];
+
+                    foreach ($data['recipients'] as $recipient) {
+                        $row[] = $data['matrix'][$key][$sumberId][$recipient->id] ?? 0;
+                    }
+
+                    $row[] = $data['totalPerSumber'][$key][$sumberId] ?? 0;
+                    $row[] = $pertama ? ($data['dailyTotals'][$key] ?? 0) : '';
+                    fputcsv($out, $row);
+
+                    $pertama = false;
+                }
             }
 
-            $footer = ['TOTAL'];
+            $footer = ['TOTAL PER ORANG', ''];
             foreach ($data['recipients'] as $recipient) {
                 $footer[] = $data['recipientTotals'][$recipient->id] ?? 0;
             }
+            $footer[] = $data['grandTotal'];
             $footer[] = $data['grandTotal'];
             fputcsv($out, $footer);
 
@@ -56,18 +80,44 @@ class RekapController extends Controller
     }
 
     /**
-     * Menyusun matriks tanggal x penerima, bentuk yang sama dengan rekap
-     * manual yang selama ini dipakai.
+     * Menyusun matriks tanggal x rekening sumber x penerima. Satu hari bisa
+     * punya beberapa batch transfer, dan tiap batch tampil sebagai baris
+     * tersendiri, sama seperti rekap manual yang selama ini dipakai.
      */
     private function buildPivot(Request $request): array
     {
-        $dari = $request->filled('dari')
-            ? Carbon::parse($request->input('dari'))->startOfDay()
-            : now()->startOfMonth();
+        // Tanggal yang diisi manual selalu menang. Tanpa itu, dipakai rentang
+        // pintas yang dipilih, dan tanpa itu juga, minggu berjalan.
+        $rentang = $request->input('rentang', 'minggu');
+        $sampai = now()->startOfDay();
+        $senin = null;
 
-        $sampai = $request->filled('sampai')
-            ? Carbon::parse($request->input('sampai'))->startOfDay()
-            : now()->endOfMonth()->startOfDay();
+        if ($rentang === 'minggu') {
+            // Minggu kalender Senin sampai Minggu, bukan tujuh hari ke belakang,
+            // supaya rekapnya sejajar dengan cara orang membaca kalender.
+            $senin = $request->filled('minggu')
+                ? Carbon::parse($request->input('minggu'))->startOfWeek(Carbon::MONDAY)
+                : now()->startOfWeek(Carbon::MONDAY);
+
+            $dari = $senin->copy();
+            $sampai = $senin->copy()->addDays(6);
+        } else {
+            $dari = match ($rentang) {
+                'tahun' => now()->subYear()->startOfDay(),
+                'bulan' => now()->subMonth()->startOfDay(),
+                default => now()->subDays(6)->startOfDay(),
+            };
+        }
+
+        if ($request->filled('dari')) {
+            $dari = Carbon::parse($request->input('dari'))->startOfDay();
+            $rentang = null;
+        }
+
+        if ($request->filled('sampai')) {
+            $sampai = Carbon::parse($request->input('sampai'))->startOfDay();
+            $rentang = null;
+        }
 
         if ($sampai->lt($dari)) {
             [$dari, $sampai] = [$sampai, $dari];
@@ -75,23 +125,31 @@ class RekapController extends Controller
 
         $rows = Transaction::query()
             ->whereBetween('tanggal', [$dari->toDateString(), $sampai->toDateString()])
-            ->selectRaw('tanggal, recipient_id, SUM(nominal_transfer) as total')
-            ->groupBy('tanggal', 'recipient_id')
+            ->selectRaw('tanggal, source_account_id, recipient_id, SUM(nominal_transfer) as total')
+            ->groupBy('tanggal', 'source_account_id', 'recipient_id')
             ->get();
 
         $matrix = [];
+        $sumberPerTanggal = [];
+        $totalPerSumber = [];
         $dailyTotals = [];
         $recipientTotals = [];
         $grandTotal = 0;
 
         foreach ($rows as $row) {
             $key = Carbon::parse($row->tanggal)->toDateString();
+            $sumberId = $row->source_account_id;
             $total = (int) $row->total;
 
-            $matrix[$key][$row->recipient_id] = $total;
+            $matrix[$key][$sumberId][$row->recipient_id] = $total;
+            $totalPerSumber[$key][$sumberId] = ($totalPerSumber[$key][$sumberId] ?? 0) + $total;
             $dailyTotals[$key] = ($dailyTotals[$key] ?? 0) + $total;
             $recipientTotals[$row->recipient_id] = ($recipientTotals[$row->recipient_id] ?? 0) + $total;
             $grandTotal += $total;
+        }
+
+        foreach ($matrix as $key => $perSumber) {
+            $sumberPerTanggal[$key] = array_keys($perSumber);
         }
 
         // Hanya tampilkan penerima yang benar-benar punya transaksi di periode
@@ -101,19 +159,46 @@ class RekapController extends Controller
             ->orderBy('nama')
             ->get();
 
+        $jumlahHari = $dari->diffInDays($sampai) + 1;
         $dates = [];
-        for ($d = $dari->copy(); $d->lte($sampai); $d->addDay()) {
-            $dates[] = $d->copy();
+
+        if ($jumlahHari <= 31) {
+            for ($d = $dari->copy(); $d->lte($sampai); $d->addDay()) {
+                $dates[] = $d->copy();
+            }
+        } else {
+            foreach (array_keys($dailyTotals) as $key) {
+                $dates[] = Carbon::parse($key);
+            }
+
+            usort($dates, fn (Carbon $a, Carbon $b) => $a <=> $b);
         }
 
         $hariTerisi = count($dailyTotals);
 
+        // Daftar minggu untuk pilihan cepat, dari minggu berjalan ke belakang.
+        $pilihanMinggu = [];
+        $kursor = now()->startOfWeek(Carbon::MONDAY);
+
+        for ($i = 0; $i < 16; $i++) {
+            $pilihanMinggu[] = $kursor->copy();
+            $kursor->subWeek();
+        }
+
         return [
+            'rentang' => $rentang,
+            'senin' => $senin,
+            'pilihanMinggu' => $pilihanMinggu,
+            'mingguIni' => now()->startOfWeek(Carbon::MONDAY),
+            'ringkas' => $jumlahHari > 31,
             'dari' => $dari,
             'sampai' => $sampai,
             'dates' => $dates,
             'recipients' => $recipients,
+            'namaSumber' => SourceAccount::pluck('nama', 'id'),
             'matrix' => $matrix,
+            'sumberPerTanggal' => $sumberPerTanggal,
+            'totalPerSumber' => $totalPerSumber,
             'dailyTotals' => $dailyTotals,
             'recipientTotals' => $recipientTotals,
             'grandTotal' => $grandTotal,
