@@ -156,7 +156,7 @@ class MandiriPdfParser
             $bank = $bankRaw !== '' ? ($this->tebakBank($bankRaw) ?? $bankRaw) : null;
 
             $remarkRaw = trim((string) ($item['remark'] ?? $item['keterangan'] ?? ''));
-            $sumberRaw = preg_replace('/\D/u', '', (string) ($item['sumber_rekening'] ?? ''));
+            $sumberRaw = preg_replace('/\D/u', '', (string) ($item['sumber_rekening'] ?? $item['rekening_sumber'] ?? $item['sender_account'] ?? ''));
 
             $baris[] = [
                 'ref_transaksi' => $ref,
@@ -166,7 +166,7 @@ class MandiriPdfParser
                 'nama' => $this->rapikanNama((string) ($item['nama'] ?? $item['beneficiary_name'] ?? '')),
                 'bank' => $bank,
                 'remark' => ($remarkRaw === '' || $remarkRaw === '-') ? null : $remarkRaw,
-                'sumber_rekening' => strlen($sumberRaw) >= 6 ? $sumberRaw : null,
+                'sumber_rekening' => $sumberRaw !== '' ? $sumberRaw : null,
             ];
         }
 

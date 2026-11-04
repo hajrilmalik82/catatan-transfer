@@ -15,15 +15,12 @@ class ImportController extends Controller
 
     public function form()
     {
-        return view('import', [
-            'sourceAccounts' => SourceAccount::where('aktif', true)->orderBy('nama')->get(),
-        ]);
+        return view('import');
     }
 
     public function preview(Request $request, MandiriPdfParser $parser)
     {
         $data = $request->validate([
-            'source_account_id' => ['required', 'exists:source_accounts,id'],
             'berkas' => ['required_without:raw_code', 'nullable', 'file', 'mimes:pdf', 'max:10240'],
             'raw_code' => ['required_without:berkas', 'nullable', 'string'],
         ]);
@@ -57,39 +54,29 @@ class ImportController extends Controller
         // di depan untuk mengantisipasi nomor rekening yang pernah disimpan dari Excel.
         $penerima = Recipient::pluck('id', 'nomor_rekening');
         $penerimaTanpaNol = $penerima->mapWithKeys(fn ($id, $rek) => [ltrim((string) $rek, '0') => $id]);
-        $sumber = SourceAccount::whereNotNull('nomor_rekening')->pluck('id', 'nomor_rekening');
+
+        $sumber = SourceAccount::whereNotNull('nomor_rekening')
+            ->where('nomor_rekening', '!=', '')
+            ->pluck('id', 'nomor_rekening');
+        $sumberTanpaNol = $sumber->mapWithKeys(fn ($id, $rek) => [ltrim((string) $rek, '0') => $id]);
+
         $sudahAda = Transaction::whereIn('ref_transaksi', array_column($hasil['baris'], 'ref_transaksi'))
             ->pluck('ref_transaksi')
             ->all();
 
         $baris = [];
-        $belumTerdaftar = [];
 
         foreach ($hasil['baris'] as $row) {
             $noRek = (string) $row['nomor_rekening'];
             $row['recipient_id'] = $penerima[$noRek] ?? $penerimaTanpaNol[ltrim($noRek, '0')] ?? null;
             $row['duplikat'] = in_array($row['ref_transaksi'], $sudahAda, true);
 
-            // Rekening sumber diambil dari isi berkas. Pilihan di form hanya
-            // dipakai kalau berkasnya tidak menyebutkan nomor rekening.
-            $noSumber = $row['sumber_rekening'] ?? null;
-
-            if ($noSumber === null || ($dariRaw && ! isset($sumber[$noSumber]))) {
-                $row['source_account_id'] = (int) $data['source_account_id'];
-            } elseif (isset($sumber[$noSumber])) {
-                $row['source_account_id'] = $sumber[$noSumber];
-            } else {
-                $belumTerdaftar[$noSumber] = true;
-                $row['source_account_id'] = null;
-            }
+            $noSumber = isset($row['sumber_rekening']) ? (string) $row['sumber_rekening'] : '';
+            $row['source_account_id'] = $noSumber !== ''
+                ? ($sumber[$noSumber] ?? $sumberTanpaNol[ltrim($noSumber, '0')] ?? null)
+                : null;
 
             $baris[] = $row;
-        }
-
-        if ($belumTerdaftar !== []) {
-            $nomor = implode(', ', array_keys($belumTerdaftar));
-
-            return back()->withErrors(['berkas' => "Rekening sumber {$nomor} belum terdaftar. Tambahkan dulu di menu Rekening Sumber beserta nomor rekeningnya, lalu unggah ulang."])->withInput();
         }
 
         $request->session()->put(self::KUNCI_SESI, ['baris' => $baris]);
@@ -98,8 +85,8 @@ class ImportController extends Controller
             'teksMentah' => mb_substr($teksMentah, 0, 20000),
             'baris' => $baris,
             'gagal' => $hasil['gagal'],
+            'sourceAccounts' => SourceAccount::where('aktif', true)->orderBy('nama')->get(),
             'recipients' => Recipient::where('aktif', true)->orderBy('nama')->get(),
-            'namaSumber' => SourceAccount::pluck('nama', 'id'),
         ]);
     }
 
@@ -115,6 +102,8 @@ class ImportController extends Controller
         $data = $request->validate([
             'tanggal' => ['required', 'date'],
             'biaya_admin' => ['required', 'integer', 'min:0'],
+            'pilihan_sumber' => ['required', 'array'],
+            'pilihan_sumber.*' => ['required', 'string'],
             'pilihan' => ['required', 'array'],
             'pilihan.*' => ['required', 'string'],
             'remark' => ['array'],
@@ -124,15 +113,55 @@ class ImportController extends Controller
         $tersimpan = 0;
         $dilewati = 0;
         $penerimaBaru = 0;
+        $sumberBaru = 0;
 
-        DB::transaction(function () use ($sesi, $data, &$tersimpan, &$dilewati, &$penerimaBaru) {
+        DB::transaction(function () use ($sesi, $data, &$tersimpan, &$dilewati, &$penerimaBaru, &$sumberBaru) {
             foreach ($sesi['baris'] as $i => $row) {
                 $pilihan = $data['pilihan'][$i] ?? 'lewati';
+                $pilihanSumber = $data['pilihan_sumber'][$i] ?? 'lewati';
 
-                if ($pilihan === 'lewati') {
+                if ($pilihan === 'lewati' || $pilihanSumber === 'lewati') {
                     $dilewati++;
 
                     continue;
+                }
+
+                $noSumber = $row['sumber_rekening'] ?? null;
+
+                if ($pilihanSumber === 'baru') {
+                    $labelSumber = $noSumber ? "Rekening {$noSumber}" : 'Rekening Sumber Baru';
+                    $sumber = $noSumber
+                        ? SourceAccount::firstOrCreate(
+                            ['nomor_rekening' => $noSumber],
+                            ['nama' => $labelSumber, 'aktif' => true]
+                        )
+                        : SourceAccount::firstOrCreate(
+                            ['nama' => $labelSumber],
+                            ['aktif' => true]
+                        );
+
+                    if ($sumber->wasRecentlyCreated) {
+                        $sumberBaru++;
+                    }
+
+                    $sourceAccountId = $sumber->id;
+                } else {
+                    $sourceAccountId = (int) $pilihanSumber;
+
+                    // Jika rekening sumber yang dipilih belum punya nomor rekening
+                    // sedangkan bukti transfer memuat nomornya, simpan sekalian
+                    // supaya import berikutnya langsung cocok otomatis.
+                    if ($noSumber) {
+                        $akunSumber = SourceAccount::find($sourceAccountId);
+
+                        if ($akunSumber && blank($akunSumber->nomor_rekening)) {
+                            $sudahDipakai = SourceAccount::where('nomor_rekening', $noSumber)->exists();
+
+                            if (! $sudahDipakai) {
+                                $akunSumber->update(['nomor_rekening' => $noSumber]);
+                            }
+                        }
+                    }
                 }
 
                 if ($pilihan === 'baru') {
@@ -160,7 +189,7 @@ class ImportController extends Controller
                     ['ref_transaksi' => $row['ref_transaksi']],
                     [
                         'tanggal' => $data['tanggal'],
-                        'source_account_id' => $row['source_account_id'],
+                        'source_account_id' => $sourceAccountId,
                         'recipient_id' => $recipientId,
                         'remark' => $data['remark'][$i] ?? $row['remark'],
                         'nominal_tagihan' => $row['nominal'],
@@ -175,6 +204,7 @@ class ImportController extends Controller
         $request->session()->forget(self::KUNCI_SESI);
 
         $pesan = "{$tersimpan} transaksi tersimpan";
+        $pesan .= $sumberBaru > 0 ? ", {$sumberBaru} rekening sumber baru dibuat" : '';
         $pesan .= $penerimaBaru > 0 ? ", {$penerimaBaru} penerima baru dibuat" : '';
         $pesan .= $dilewati > 0 ? ", {$dilewati} dilewati" : '';
 

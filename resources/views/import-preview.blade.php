@@ -10,14 +10,10 @@
 <div class="mx-auto max-w-[1200px] p-4 sm:p-6">
 
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-        @php $sumberTerpakai = collect($baris)->pluck('source_account_id')->unique(); @endphp
         <div>
             <h1 class="text-xl font-semibold">Periksa Hasil Baca</h1>
             <p class="text-sm text-gray-600">
-                {{ count($baris) }} transaksi terbaca &middot; sumber:
-                <span class="font-medium">
-                    {{ $sumberTerpakai->map(fn ($id) => $namaSumber[$id] ?? '?')->join(', ') }}
-                </span>
+                {{ count($baris) }} transaksi terbaca
             </p>
         </div>
         <a href="{{ route('import') }}" class="text-sm text-blue-700 hover:underline">Ganti berkas</a>
@@ -31,11 +27,21 @@
         </div>
     @endif
 
-    @php $belumDikenal = collect($baris)->whereNull('recipient_id')->count(); @endphp
+    @php
+        $sumberBelumDikenal = collect($baris)->whereNull('source_account_id')->count();
+        $belumDikenal = collect($baris)->whereNull('recipient_id')->count();
+    @endphp
+
+    @if ($sumberBelumDikenal > 0)
+        <div class="mb-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <strong>{{ $sumberBelumDikenal }} rekening sumber belum dikenal.</strong>
+            Pilih rekening sumber yang sesuai di kolom Sumber, atau biarkan "Buat rekening sumber baru".
+        </div>
+    @endif
 
     @if ($belumDikenal > 0)
         <div class="mb-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            <strong>{{ $belumDikenal }} nomor rekening belum dikenal.</strong>
+            <strong>{{ $belumDikenal }} nomor rekening penerima belum dikenal.</strong>
             Pilih penerima yang sesuai, atau biarkan "Buat penerima baru" kalau memang orang baru.
         </div>
     @endif
@@ -94,13 +100,30 @@
                 <tbody class="divide-y divide-gray-200">
                 @foreach ($baris as $i => $row)
                     <tr class="{{ $row['duplikat'] ? 'bg-amber-50' : '' }}">
-                        <td class="px-3 py-2 align-top text-xs text-gray-600">
-                            {{ $namaSumber[$row['source_account_id']] ?? '?' }}
+                        <td class="px-3 py-2 align-top">
                             @if ($row['sumber_rekening'] ?? null)
-                                <span class="mt-0.5 block text-gray-400">{{ $row['sumber_rekening'] }}</span>
+                                <div class="mb-1 text-xs text-gray-500">No. Rek: {{ $row['sumber_rekening'] }}</div>
+                            @else
+                                <div class="mb-1 text-xs text-gray-400">No. rek tidak terbaca</div>
+                            @endif
+                            <select name="pilihan_sumber[{{ $i }}]"
+                                    data-sumber-rek="{{ $row['sumber_rekening'] ?? '' }}"
+                                    class="select-sumber w-56 rounded border-gray-300 text-sm shadow-sm">
+                                <option value="baru" @selected(! $row['source_account_id'])>
+                                    + Buat rekening sumber baru{{ ($row['sumber_rekening'] ?? null) ? ': '.$row['sumber_rekening'] : '' }}
+                                </option>
+                                @foreach ($sourceAccounts as $akun)
+                                    <option value="{{ $akun->id }}" @selected($row['source_account_id'] === $akun->id)>
+                                        {{ $akun->label }}
+                                    </option>
+                                @endforeach
+                                <option value="lewati">Lewati baris ini</option>
+                            </select>
+                            @if ($row['source_account_id'])
+                                <div class="mt-1 text-xs text-emerald-700">cocok lewat nomor rekening</div>
                             @endif
                             @if ($row['duplikat'])
-                                <span class="mt-1 block text-amber-700">sudah pernah diimport</span>
+                                <span class="mt-1 block text-xs text-amber-700">sudah pernah diimport</span>
                             @endif
                         </td>
                         <td class="px-3 py-2 align-top">
@@ -160,6 +183,24 @@
             </a>
         </div>
     </form>
+
+    <script>
+    (() => {
+        const daftarSelect = document.querySelectorAll('.select-sumber');
+
+        daftarSelect.forEach((el) => {
+            el.addEventListener('change', () => {
+                const rek = el.dataset.sumberRek;
+
+                daftarSelect.forEach((lain) => {
+                    if (lain !== el && lain.dataset.sumberRek === rek && lain.value === 'baru') {
+                        lain.value = el.value;
+                    }
+                });
+            });
+        });
+    })();
+    </script>
 
 </div>
 </body>

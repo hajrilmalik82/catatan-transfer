@@ -65,6 +65,7 @@ class TransactionResource extends Resource
             Select::make('source_account_id')
                 ->label('Rekening Sumber')
                 ->relationship('sourceAccount', 'nama', fn (Builder $query) => $query->where('aktif', true))
+                ->getOptionLabelFromRecordUsing(fn ($record): string => $record->label)
                 ->searchable()
                 ->preload()
                 ->required(),
@@ -72,6 +73,7 @@ class TransactionResource extends Resource
             Select::make('recipient_id')
                 ->label('Penerima')
                 ->relationship('recipient', 'nama', fn (Builder $query) => $query->where('aktif', true))
+                ->getOptionLabelFromRecordUsing(fn ($record): string => $record->label)
                 ->searchable()
                 ->preload()
                 ->required(),

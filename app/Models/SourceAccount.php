@@ -17,4 +17,11 @@ class SourceAccount extends Model
     {
         return $this->hasMany(Transaction::class);
     }
+
+    public function getLabelAttribute(): string
+    {
+        return $this->nomor_rekening
+            ? "{$this->nama} ({$this->nomor_rekening})"
+            : $this->nama;
+    }
 }
