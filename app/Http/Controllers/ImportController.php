@@ -24,23 +24,39 @@ class ImportController extends Controller
     {
         $data = $request->validate([
             'source_account_id' => ['required', 'exists:source_accounts,id'],
-            'berkas' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'berkas' => ['required_without:raw_code', 'nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'raw_code' => ['required_without:berkas', 'nullable', 'string'],
         ]);
 
-        $hasil = $parser->parse($request->file('berkas')->getRealPath());
+        $dariRaw = $request->filled('raw_code');
+
+        if ($dariRaw) {
+            $teksMentah = (string) $data['raw_code'];
+            $hasil = $parser->parseRawCode($teksMentah);
+        } else {
+            $path = $request->file('berkas')->getRealPath();
+            $teksMentah = $parser->teksMentah($path);
+            $hasil = $parser->parse($path);
+        }
 
         if ($hasil['baris'] === []) {
+            $pesanGagal = $hasil['gagal'] !== []
+                ? implode(' ', $hasil['gagal'])
+                : 'Tidak ada transaksi yang bisa dibaca dari masukan ini.';
+
             // Susunan teks hasil ekstraksi bisa berbeda antar berkas. Cuplikan
             // mentahnya ditampilkan supaya penyebabnya langsung kelihatan.
             return back()
-                ->withErrors(['berkas' => 'Tidak ada transaksi yang bisa dibaca dari berkas ini.'])
-                ->with('teksMentah', mb_substr($parser->teksMentah($request->file('berkas')->getRealPath()), 0, 3000))
+                ->withErrors(['berkas' => $pesanGagal])
+                ->with('teksMentah', mb_substr($teksMentah, 0, 3000))
                 ->withInput();
         }
 
         // Pencocokan memakai nomor rekening, bukan nama, karena bank memotong
-        // nama penerima pada panjang tertentu.
+        // nama penerima pada panjang tertentu. Dicocokkan juga tanpa angka nol
+        // di depan untuk mengantisipasi nomor rekening yang pernah disimpan dari Excel.
         $penerima = Recipient::pluck('id', 'nomor_rekening');
+        $penerimaTanpaNol = $penerima->mapWithKeys(fn ($id, $rek) => [ltrim((string) $rek, '0') => $id]);
         $sumber = SourceAccount::whereNotNull('nomor_rekening')->pluck('id', 'nomor_rekening');
         $sudahAda = Transaction::whereIn('ref_transaksi', array_column($hasil['baris'], 'ref_transaksi'))
             ->pluck('ref_transaksi')
@@ -50,14 +66,15 @@ class ImportController extends Controller
         $belumTerdaftar = [];
 
         foreach ($hasil['baris'] as $row) {
-            $row['recipient_id'] = $penerima[$row['nomor_rekening']] ?? null;
+            $noRek = (string) $row['nomor_rekening'];
+            $row['recipient_id'] = $penerima[$noRek] ?? $penerimaTanpaNol[ltrim($noRek, '0')] ?? null;
             $row['duplikat'] = in_array($row['ref_transaksi'], $sudahAda, true);
 
             // Rekening sumber diambil dari isi berkas. Pilihan di form hanya
             // dipakai kalau berkasnya tidak menyebutkan nomor rekening.
             $noSumber = $row['sumber_rekening'] ?? null;
 
-            if ($noSumber === null) {
+            if ($noSumber === null || ($dariRaw && ! isset($sumber[$noSumber]))) {
                 $row['source_account_id'] = (int) $data['source_account_id'];
             } elseif (isset($sumber[$noSumber])) {
                 $row['source_account_id'] = $sumber[$noSumber];
@@ -78,7 +95,7 @@ class ImportController extends Controller
         $request->session()->put(self::KUNCI_SESI, ['baris' => $baris]);
 
         return view('import-preview', [
-            'teksMentah' => mb_substr($parser->teksMentah($request->file('berkas')->getRealPath()), 0, 20000),
+            'teksMentah' => mb_substr($teksMentah, 0, 20000),
             'baris' => $baris,
             'gagal' => $hasil['gagal'],
             'recipients' => Recipient::where('aktif', true)->orderBy('nama')->get(),

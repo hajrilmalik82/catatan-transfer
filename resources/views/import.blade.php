@@ -46,14 +46,25 @@
             sebelum mengimport.
         </div>
     @else
-        <form method="POST" action="{{ route('import.preview') }}" enctype="multipart/form-data"
+        <div class="mb-4 flex gap-2">
+            <button type="button" id="tab-btn-pdf"
+                    class="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition">
+                Unggah Berkas PDF
+            </button>
+            <button type="button" id="tab-btn-raw"
+                    class="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition">
+                Tempel Raw Code (AI)
+            </button>
+        </div>
+
+        <form id="panel-pdf" method="POST" action="{{ route('import.preview') }}" enctype="multipart/form-data"
               class="space-y-5 rounded-lg bg-white p-5 shadow-sm">
             @csrf
 
             <div>
                 <label for="source_account_id" class="block text-sm font-medium">Rekening Sumber</label>
                 <select id="source_account_id" name="source_account_id" required
-                        class="mt-1 w-full rounded border-gray-300 shadow-sm">
+                        class="mt-1 w-full rounded border border-gray-300 p-2 text-sm shadow-sm">
                     @foreach ($sourceAccounts as $akun)
                         <option value="{{ $akun->id }}" @selected(old('source_account_id') == $akun->id)>
                             {{ $akun->nama }}
@@ -81,10 +92,106 @@
             </button>
         </form>
 
+        <form id="panel-raw" method="POST" action="{{ route('import.preview') }}"
+              class="hidden space-y-5 rounded-lg bg-white p-5 shadow-sm">
+            @csrf
+
+            <div>
+                <label for="source_account_id_raw" class="block text-sm font-medium">Rekening Sumber</label>
+                <select id="source_account_id_raw" name="source_account_id" required
+                        class="mt-1 w-full rounded border border-gray-300 p-2 text-sm shadow-sm">
+                    @foreach ($sourceAccounts as $akun)
+                        <option value="{{ $akun->id }}" @selected(old('source_account_id') == $akun->id)>
+                            {{ $akun->nama }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-gray-500">
+                    Dipakai sebagai rekening pengirim (misalnya untuk bukti scan CamScanner / Qlola BRI).
+                </p>
+            </div>
+
+            <div class="rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-900">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span>Gunakan untuk PDF hasil scan CamScanner atau bank selain Mandiri asli.</span>
+                    <button type="button" id="btn-salin-prompt"
+                            class="rounded bg-blue-600 px-3 py-1.5 font-medium text-white hover:bg-blue-700">
+                        Salin Prompt untuk AI
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <label for="raw_code" class="block text-sm font-medium">Raw Code (JSON dari AI)</label>
+                <textarea id="raw_code" name="raw_code" rows="9" required
+                          placeholder='[{"ref_transaksi":"BIF38377118","tanggal":"2026-11-03","nominal":1653500,"nomor_rekening":"1100021578916","nama":"Rini Ardianty","bank":"Mandiri","remark":"Pembayaran BB Protein"}]'
+                          class="mt-1 w-full rounded border border-gray-300 p-2.5 font-mono text-xs shadow-sm">{{ old('raw_code') }}</textarea>
+            </div>
+
+            <button type="submit"
+                    class="w-full rounded bg-blue-600 px-4 py-2.5 font-medium text-white hover:bg-blue-700">
+                Baca Raw Code
+            </button>
+        </form>
+
         <p class="mt-4 text-xs text-gray-500">
-            Berkasnya hanya dibaca, tidak disimpan di server. Hasil bacaan ditampilkan dulu untuk kamu
-            periksa sebelum masuk ke database.
+            Hasil bacaan ditampilkan dulu untuk kamu periksa sebelum masuk ke database.
         </p>
+
+        <script>
+        (() => {
+            const btnPdf = document.getElementById('tab-btn-pdf');
+            const btnRaw = document.getElementById('tab-btn-raw');
+            const panelPdf = document.getElementById('panel-pdf');
+            const panelRaw = document.getElementById('panel-raw');
+            const btnPrompt = document.getElementById('btn-salin-prompt');
+
+            const aktif = ['bg-blue-600', 'text-white', 'border-blue-600'];
+            const nonAktif = ['bg-white', 'text-gray-700', 'border-gray-300'];
+
+            const pilihTab = (mode) => {
+                const keRaw = mode === 'raw';
+                panelPdf.classList.toggle('hidden', keRaw);
+                panelRaw.classList.toggle('hidden', ! keRaw);
+                btnPdf.classList.remove(...(keRaw ? aktif : nonAktif));
+                btnPdf.classList.add(...(keRaw ? nonAktif : aktif));
+                btnRaw.classList.remove(...(keRaw ? nonAktif : aktif));
+                btnRaw.classList.add(...(keRaw ? aktif : nonAktif));
+            };
+
+            btnPdf.addEventListener('click', () => pilihTab('pdf'));
+            btnRaw.addEventListener('click', () => pilihTab('raw'));
+
+            pilihTab(@json(old('raw_code') ? 'raw' : 'pdf'));
+
+            const promptTeks = `Baca seluruh halaman bukti transfer ini dan ubah menjadi JSON array murni (tanpa penjelasan tambahan) dengan format berikut:
+[
+  {
+    "ref_transaksi": "ID Transaksi / Transaction ID (contoh: BIF38377118)",
+    "tanggal": "YYYY-MM-DD",
+    "nominal": 1653500,
+    "nomor_rekening": "hanya digit nomor rekening penerima (Beneficiary Account Number)",
+    "nama": "Nama penerima (Beneficiary Account Name)",
+    "bank": "Singkatan bank penerima: Mandiri / BNI / BRI / BSI / BCA / CIMB Niaga / Permata / Danamon / BTN / Lainnya",
+    "remark": "Isi Remark / Keterangan singkat"
+  }
+]
+Catatan:
+- "nominal" harus berupa angka bulat Rupiah (Transaction Amount yang dikirim, tanpa titik/koma/desimal).
+- Hanya masukkan transaksi yang berstatus Success / Sukses.`;
+
+            btnPrompt?.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(promptTeks);
+                    const asli = btnPrompt.textContent;
+                    btnPrompt.textContent = 'Prompt Tersalin!';
+                    setTimeout(() => { btnPrompt.textContent = asli; }, 2000);
+                } catch {
+                    prompt('Salin prompt berikut:', promptTeks);
+                }
+            });
+        })();
+        </script>
     @endif
 
 </div>

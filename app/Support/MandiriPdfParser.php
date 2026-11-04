@@ -84,6 +84,95 @@ class MandiriPdfParser
         return ['baris' => $baris, 'gagal' => $gagal];
     }
 
+    /**
+     * Membaca JSON hasil ekstraksi AI (untuk PDF scan CamScanner atau bukti
+     * transfer bank lain) ke struktur baris yang sama dengan hasil baca PDF.
+     *
+     * @return array{baris: array<int, array<string, mixed>>, gagal: array<int, string>}
+     */
+    public function parseRawCode(string $raw): array
+    {
+        $bersih = trim($raw);
+        $bersih = preg_replace('/^```(?:json)?\s*|\s*```$/iu', '', $bersih);
+        $decoded = json_decode(trim((string) $bersih), true);
+
+        if (! is_array($decoded)) {
+            return ['baris' => [], 'gagal' => ['Format raw code bukan JSON yang valid.']];
+        }
+
+        if (isset($decoded['ref_transaksi']) || isset($decoded['nomor_rekening'])) {
+            $daftar = [$decoded];
+        } else {
+            $daftar = $decoded['baris'] ?? $decoded['data'] ?? $decoded['transaksi'] ?? $decoded['transactions'] ?? $decoded;
+        }
+
+        if (! is_array($daftar)) {
+            return ['baris' => [], 'gagal' => ['Struktur daftar transaksi di raw code tidak terbaca.']];
+        }
+
+        $baris = [];
+        $gagal = [];
+
+        foreach ($daftar as $idx => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $nomorUrut = $idx + 1;
+            $ref = trim((string) ($item['ref_transaksi'] ?? $item['id_transaksi'] ?? $item['transaction_id'] ?? ''));
+
+            if ($ref === '') {
+                $gagal[] = "Baris ke-{$nomorUrut} dilewati: ref_transaksi kosong.";
+
+                continue;
+            }
+
+            $status = isset($item['status']) ? mb_strtolower(trim((string) $item['status'])) : 'sukses';
+
+            if ($status !== '' && ! in_array($status, ['sukses', 'success', 'berhasil'], true)) {
+                $gagal[] = "Transaksi {$ref} dilewati: statusnya bukan Sukses.";
+
+                continue;
+            }
+
+            $nominalRaw = $item['nominal'] ?? $item['nominal_transfer'] ?? $item['amount'] ?? null;
+            $nominal = is_int($nominalRaw) ? $nominalRaw : $this->bersihkanNominal((string) $nominalRaw);
+            $noRek = preg_replace('/\D/u', '', (string) ($item['nomor_rekening'] ?? $item['rekening_tujuan'] ?? $item['account_number'] ?? ''));
+            $tanggalRaw = trim((string) ($item['tanggal'] ?? $item['date'] ?? ''));
+
+            try {
+                $tanggal = $tanggalRaw !== '' ? Carbon::parse($tanggalRaw)->toDateString() : null;
+            } catch (\Throwable) {
+                $tanggal = null;
+            }
+
+            if ($nominal <= 0 || $noRek === '' || $tanggal === null) {
+                $gagal[] = "Transaksi {$ref} dilewati: nominal, nomor_rekening, atau tanggal tidak lengkap.";
+
+                continue;
+            }
+
+            $bankRaw = trim((string) ($item['bank'] ?? ''));
+            $bank = $bankRaw !== '' ? ($this->tebakBank($bankRaw) ?? $bankRaw) : null;
+
+            $remarkRaw = trim((string) ($item['remark'] ?? $item['keterangan'] ?? ''));
+            $sumberRaw = preg_replace('/\D/u', '', (string) ($item['sumber_rekening'] ?? ''));
+
+            $baris[] = [
+                'ref_transaksi' => $ref,
+                'tanggal' => $tanggal,
+                'nominal' => $nominal,
+                'nomor_rekening' => $noRek,
+                'nama' => $this->rapikanNama((string) ($item['nama'] ?? $item['beneficiary_name'] ?? '')),
+                'bank' => $bank,
+                'remark' => ($remarkRaw === '' || $remarkRaw === '-') ? null : $remarkRaw,
+                'sumber_rekening' => strlen($sumberRaw) >= 6 ? $sumberRaw : null,
+            ];
+        }
+
+        return ['baris' => $baris, 'gagal' => $gagal];
+    }
+
     private function rapikan(string $teks): string
     {
         return trim(preg_replace('/\s+/u', ' ', $teks));
