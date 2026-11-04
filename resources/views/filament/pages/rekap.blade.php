@@ -29,18 +29,22 @@
         .rk-kartu dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--rk-redup); }
         .rk-kartu dd { margin: .25rem 0 0; font-size: 1.125rem; font-weight: 600; color: var(--rk-teks); }
 
-        .rk-gulung { overflow-x: auto; background: var(--rk-bg); border: 1px solid var(--rk-garis); border-radius: .5rem; }
-        .rk-tabel { width: 100%; min-width: 100%; border-collapse: collapse; font-size: .875rem; color: var(--rk-teks); }
-        .rk-tabel th, .rk-tabel td { padding: .5rem .75rem; border-bottom: 1px solid var(--rk-garis); }
+        .rk-gulung { --rk-skala: 1; overflow-x: auto; background: var(--rk-bg); border: 1px solid var(--rk-garis); border-radius: .5rem; }
+        .rk-tabel { width: 100%; min-width: 100%; border-collapse: collapse; font-size: calc(.875rem * var(--rk-skala)); color: var(--rk-teks); }
+        .rk-tabel th, .rk-tabel td { padding: calc(.5rem * var(--rk-skala)) calc(.75rem * var(--rk-skala)); border-bottom: 1px solid var(--rk-garis); }
         .rk-tabel thead th { background: var(--rk-kepala); text-align: left; font-weight: 600; white-space: nowrap; }
-        .rk-tabel thead th small { display: block; font-size: .75rem; font-weight: 400; color: var(--rk-redup); }
+        .rk-tabel thead th small { display: block; font-size: calc(.75rem * var(--rk-skala)); font-weight: 400; color: var(--rk-redup); }
         .rk-kanan { text-align: right; white-space: nowrap; }
         .rk-beku { position: sticky; left: 0; z-index: 1; background: var(--rk-bg); }
         .rk-tabel thead .rk-beku { background: var(--rk-kepala); }
         .rk-nol { color: var(--rk-kosong); }
         .rk-tabel tfoot td { background: var(--rk-total); font-weight: 700; }
         .rk-harian { background: var(--rk-kepala); font-weight: 600; vertical-align: top; }
-        .rk-kecil { display: block; font-size: .75rem; color: var(--rk-redup); }
+        .rk-kecil { display: block; font-size: calc(.75rem * var(--rk-skala)); color: var(--rk-redup); }
+
+        .rk-zoom { display: flex; align-items: center; justify-content: flex-end; gap: .375rem; margin-bottom: .5rem; font-size: .75rem; color: var(--rk-redup); }
+        .rk-zoom button { border: 1px solid var(--rk-garis); background: var(--rk-bg); color: var(--rk-teks);
+                          border-radius: .375rem; padding: .2rem .55rem; font-size: .75rem; font-weight: 600; cursor: pointer; line-height: 1.25; }
 
         @media (max-width: 640px) {
             .rk-bar { padding: .5rem .625rem; gap: .5rem; }
@@ -48,12 +52,12 @@
             .rk-kartu > div { padding: .625rem .75rem; }
             .rk-kartu dt { font-size: .65rem; }
             .rk-kartu dd { font-size: .95rem; }
-            .rk-tabel { font-size: .6875rem; line-height: 1.25; }
-            .rk-tabel th, .rk-tabel td { padding: .35rem .275rem; }
+            .rk-tabel { font-size: calc(.6875rem * var(--rk-skala)); line-height: 1.25; }
+            .rk-tabel th, .rk-tabel td { padding: calc(.35rem * var(--rk-skala)) calc(.275rem * var(--rk-skala)); }
             .rk-tabel thead th { white-space: normal; vertical-align: bottom; }
-            .rk-tabel thead th small, .rk-kecil { font-size: .5625rem; line-height: 1.15; word-break: break-all; }
-            .rk-beku { max-width: 3.25rem; white-space: normal; }
-            .rk-tabel tbody td:nth-child(2) { max-width: 5rem; }
+            .rk-tabel thead th small, .rk-kecil { font-size: calc(.5625rem * var(--rk-skala)); line-height: 1.15; word-break: break-all; }
+            .rk-beku { max-width: calc(3.25rem * var(--rk-skala)); white-space: normal; }
+            .rk-tabel tbody td:nth-child(2) { max-width: calc(5rem * var(--rk-skala)); }
         }
     </style>
 
@@ -122,7 +126,13 @@
                 Belum ada transaksi pada rentang tanggal ini.
             </div>
         @else
-            <div class="rk-gulung">
+            <div class="rk-zoom">
+                <span>Ukuran tabel:</span>
+                <button type="button" id="rk-zoom-kurang" title="Perkecil">&minus;</button>
+                <button type="button" id="rk-zoom-reset" title="Kembalikan ke ukuran semula">100%</button>
+                <button type="button" id="rk-zoom-tambah" title="Perbesar">+</button>
+            </div>
+            <div class="rk-gulung" id="rk-gulung">
                 <table class="rk-tabel">
                     <thead>
                         <tr>
@@ -205,6 +215,50 @@
 
     <script>
     (() => {
+        const gulung = document.getElementById('rk-gulung');
+        const btnKurang = document.getElementById('rk-zoom-kurang');
+        const btnReset = document.getElementById('rk-zoom-reset');
+        const btnTambah = document.getElementById('rk-zoom-tambah');
+
+        if (gulung && btnKurang && btnReset && btnTambah) {
+            let skala = 1;
+            const MIN = 0.6;
+            const MAX = 1.5;
+
+            const terapkan = (nilai) => {
+                skala = Math.min(MAX, Math.max(MIN, Math.round(nilai * 100) / 100));
+                gulung.style.setProperty('--rk-skala', skala);
+                btnReset.textContent = Math.round(skala * 100) + '%';
+            };
+
+            btnKurang.addEventListener('click', () => terapkan(skala - 0.1));
+            btnTambah.addEventListener('click', () => terapkan(skala + 0.1));
+            btnReset.addEventListener('click', () => terapkan(1));
+
+            let jarakAwal = null;
+            let skalaAwal = 1;
+
+            const hitungJarak = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+            gulung.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    jarakAwal = hitungJarak(e.touches);
+                    skalaAwal = skala;
+                }
+            }, { passive: true });
+
+            gulung.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2 && jarakAwal) {
+                    e.preventDefault();
+                    terapkan(skalaAwal * (hitungJarak(e.touches) / jarakAwal));
+                }
+            }, { passive: false });
+
+            gulung.addEventListener('touchend', () => {
+                jarakAwal = null;
+            });
+        }
+
         const tombol = document.getElementById('rk-export');
         const pesan = document.getElementById('rk-export-pesan');
         if (! tombol) return;
