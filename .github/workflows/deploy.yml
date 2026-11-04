@@ -60,17 +60,6 @@ jobs:
       - name: Terbitkan aset Filament
         run: php artisan filament:assets
 
-      - name: Siapkan Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-
-      - name: Bangun aset tampilan
-        run: |
-          npm ci
-          npm run build
-
       # Di hosting, isi folder public berada di public_html yang sejajar
       # dengan catatan-app, sehingga jalurnya perlu disesuaikan.
       - name: Sesuaikan jalur pada index.php
@@ -86,7 +75,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./public/
-          server-dir: /domains/apk.hajrilmalik.web.id/public_html/
+          server-dir: /public_html/
           state-name: .ftp-deploy-public.json
 
       - name: Kirim aplikasi
@@ -97,7 +86,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./
-          server-dir: /domains/apk.hajrilmalik.web.id/catatan-app/
+          server-dir: /catatan-app/
           state-name: .ftp-deploy-app.json
           # Yang tidak boleh ikut terkirim atau tersentuh sama sekali.
           # Baris .env melindungi kunci aplikasi, dan baris database/*.sqlite*

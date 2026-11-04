@@ -1,0 +1,38 @@
+name: Tes
+
+# Tes berjalan di branch kerja juga, bukan hanya main — supaya kesalahan
+# ketahuan sejak di dev, sebelum digabungkan dan ikut terkirim ke hosting.
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  tes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Siapkan PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, curl, zip, gd, intl, sqlite3, bcmath
+          coverage: none
+
+      - name: Siapkan berkas lingkungan
+        run: cp .env.example .env
+
+      - name: Pasang dependensi
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Buat kunci aplikasi sementara
+        run: php artisan key:generate
+
+      - name: Periksa gaya kode
+        run: ./vendor/bin/pint --test
+
+      - name: Jalankan tes
+        run: php artisan test
+
