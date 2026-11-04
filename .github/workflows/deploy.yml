@@ -20,12 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # Dibangun memakai PHP 8.3, versi terendah yang didukung aplikasi ini.
-      # Hasilnya tetap berjalan di 8.5 yang dipakai hosting sekarang.
+      # Dibangun memakai PHP 8.5, sesuai versi PHP di komputer lokal dan hosting.
       - name: Siapkan PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.5'
           extensions: mbstring, xml, curl, zip, gd, intl, sqlite3, bcmath
           coverage: none
 
