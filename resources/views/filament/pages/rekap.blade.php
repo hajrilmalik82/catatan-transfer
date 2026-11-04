@@ -46,6 +46,17 @@
         .rk-zoom button { border: 1px solid var(--rk-garis); background: var(--rk-bg); color: var(--rk-teks);
                           border-radius: .375rem; padding: .2rem .55rem; font-size: .75rem; font-weight: 600; cursor: pointer; line-height: 1.25; }
 
+        .rk-ada { cursor: pointer; text-decoration: underline dotted var(--rk-redup); text-underline-offset: 3px; }
+        .rk-ada--aktif { background: var(--rk-total); border-radius: .25rem; }
+        .rk-info { position: fixed; z-index: 50; display: none; max-width: 17rem; padding: .5rem .75rem;
+                   border-radius: .5rem; background: #111827; color: #f9fafb; font-size: .75rem; line-height: 1.4;
+                   box-shadow: 0 10px 15px -3px rgba(0,0,0,.25); pointer-events: none; }
+        .dark .rk-info { background: #f9fafb; color: #111827; border: 1px solid #d1d5db; }
+        .rk-info-judul { font-weight: 600; margin-bottom: .15rem; }
+        .rk-info-remark { color: #fbbf24; font-weight: 600; word-break: break-word; }
+        .dark .rk-info-remark { color: #b45309; }
+        .rk-info-ref { font-size: .6875rem; opacity: .75; margin-top: .15rem; }
+
         @media (max-width: 640px) {
             .rk-bar { padding: .5rem .625rem; gap: .5rem; }
             .rk-kartu { gap: .5rem; margin-bottom: 1rem; }
@@ -179,8 +190,17 @@
                                             @endif
                                         </td>
                                         @foreach ($recipients as $penerima)
-                                            @php $nilai = $baris['nilai'][$penerima->id] ?? null; @endphp
-                                            <td class="rk-kanan {{ $nilai ? '' : 'rk-nol' }}">
+                                            @php
+                                                $nilai = $baris['nilai'][$penerima->id] ?? null;
+                                                $rincian = $baris['info'][$penerima->id] ?? null;
+                                            @endphp
+                                            <td class="rk-kanan {{ $nilai ? 'rk-ada' : 'rk-nol' }}"
+                                                @if ($nilai)
+                                                    data-penerima="{{ $penerima->nama }}"
+                                                    data-tanggal="{{ $tanggal->translatedFormat('d M Y') }}"
+                                                    data-remark="{{ $rincian['remark'] ?? '' }}"
+                                                    data-ref="{{ $rincian['ref'] ?? '' }}"
+                                                @endif>
                                                 {{ $nilai ? number_format($nilai, 0, ',', '.') : '-' }}
                                             </td>
                                         @endforeach
@@ -210,11 +230,88 @@
                     </tfoot>
                 </table>
             </div>
+            <div id="rk-info" class="rk-info"></div>
         @endif
     </div>
 
     <script>
     (() => {
+        const kotakInfo = document.getElementById('rk-info');
+        let selAktif = null;
+
+        const tutupInfo = () => {
+            if (! kotakInfo) return;
+            kotakInfo.style.display = 'none';
+            if (selAktif) {
+                selAktif.classList.remove('rk-ada--aktif');
+                selAktif = null;
+            }
+        };
+
+        const tampilkanInfo = (sel) => {
+            if (! kotakInfo) return;
+            if (selAktif === sel && kotakInfo.style.display === 'block') {
+                tutupInfo();
+                return;
+            }
+
+            if (selAktif) selAktif.classList.remove('rk-ada--aktif');
+            selAktif = sel;
+            sel.classList.add('rk-ada--aktif');
+
+            const penerima = sel.dataset.penerima || '';
+            const tanggal = sel.dataset.tanggal || '';
+            const remark = sel.dataset.remark || '(tanpa remark)';
+            const ref = sel.dataset.ref || '';
+
+            kotakInfo.innerHTML = '';
+
+            const elJudul = document.createElement('div');
+            elJudul.className = 'rk-info-judul';
+            elJudul.textContent = `${penerima} • ${tanggal}`;
+            kotakInfo.appendChild(elJudul);
+
+            const elRemark = document.createElement('div');
+            elRemark.className = 'rk-info-remark';
+            elRemark.textContent = remark;
+            kotakInfo.appendChild(elRemark);
+
+            if (ref) {
+                const elRef = document.createElement('div');
+                elRef.className = 'rk-info-ref';
+                elRef.textContent = `Ref: ${ref}`;
+                kotakInfo.appendChild(elRef);
+            }
+
+            kotakInfo.style.display = 'block';
+
+            const rect = sel.getBoundingClientRect();
+            const infoRect = kotakInfo.getBoundingClientRect();
+
+            let top = rect.top - infoRect.height - 8;
+            if (top < 8) {
+                top = rect.bottom + 8;
+            }
+
+            let left = rect.left + (rect.width / 2) - (infoRect.width / 2);
+            left = Math.max(8, Math.min(left, window.innerWidth - infoRect.width - 8));
+
+            kotakInfo.style.top = `${top}px`;
+            kotakInfo.style.left = `${left}px`;
+        };
+
+        document.addEventListener('click', (e) => {
+            const sel = e.target.closest('.rk-ada');
+            if (sel) {
+                tampilkanInfo(sel);
+            } else {
+                tutupInfo();
+            }
+        });
+
+        window.addEventListener('scroll', tutupInfo, { passive: true });
+        document.getElementById('rk-gulung')?.addEventListener('scroll', tutupInfo, { passive: true });
+
         const gulung = document.getElementById('rk-gulung');
         const btnKurang = document.getElementById('rk-zoom-kurang');
         const btnReset = document.getElementById('rk-zoom-reset');

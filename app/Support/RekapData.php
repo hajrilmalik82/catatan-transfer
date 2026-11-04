@@ -51,7 +51,7 @@ class RekapData
             ->orderBy('tanggal')
             ->orderBy('source_account_id')
             ->orderBy('id')
-            ->get(['id', 'tanggal', 'source_account_id', 'recipient_id', 'nominal_transfer']);
+            ->get(['id', 'tanggal', 'source_account_id', 'recipient_id', 'nominal_transfer', 'remark', 'ref_transaksi']);
 
         $slot = [];
         $dailyTotals = [];
@@ -63,6 +63,10 @@ class RekapData
             $sumberId = $t->source_account_id;
             $penerimaId = $t->recipient_id;
             $nominal = (int) $t->nominal_transfer;
+            $rincian = [
+                'remark' => $t->remark,
+                'ref' => $t->ref_transaksi,
+            ];
 
             $slot[$kunci][$sumberId] ??= [];
 
@@ -74,6 +78,7 @@ class RekapData
             foreach ($slot[$kunci][$sumberId] as $i => $isi) {
                 if (! isset($isi['nilai'][$penerimaId])) {
                     $slot[$kunci][$sumberId][$i]['nilai'][$penerimaId] = $nominal;
+                    $slot[$kunci][$sumberId][$i]['info'][$penerimaId] = $rincian;
                     $slot[$kunci][$sumberId][$i]['total'] += $nominal;
                     $masuk = true;
                     break;
@@ -83,6 +88,7 @@ class RekapData
             if (! $masuk) {
                 $slot[$kunci][$sumberId][] = [
                     'nilai' => [$penerimaId => $nominal],
+                    'info' => [$penerimaId => $rincian],
                     'total' => $nominal,
                 ];
             }
@@ -103,6 +109,7 @@ class RekapData
                         'urut' => $i + 1,
                         'jumlahSlot' => count($daftar),
                         'nilai' => $isi['nilai'],
+                        'info' => $isi['info'] ?? [],
                         'total' => $isi['total'],
                     ];
                 }
