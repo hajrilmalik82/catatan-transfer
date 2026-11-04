@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,10 +14,22 @@ use Illuminate\Notifications\Notifiable;
 
 #[Fillable(['name', 'email', 'password', 'role', 'permissions'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    /*
+     | Tanpa pemeriksaan ini Filament menolak semua orang begitu APP_ENV
+     | bukan 'local' — itulah yang membuat panel 403 di hosting padahal
+     | lolos di komputer sendiri. Aturannya menumpang izin yang sudah ada:
+     | siapa pun yang punya setidaknya satu menu boleh masuk, dan admin
+     | selalu lolos karena bolehAkses() meluluskannya lebih dulu.
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->menuPertama() !== null;
+    }
 
     public function isAdmin(): bool
     {

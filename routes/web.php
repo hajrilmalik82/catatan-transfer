@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\ImportController;
-use App\Http\Middleware\BolehImport;
 use App\Http\Controllers\RekapController;
+use App\Http\Middleware\BolehImport;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/admin');

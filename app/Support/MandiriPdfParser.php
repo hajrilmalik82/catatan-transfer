@@ -48,7 +48,7 @@ class MandiriPdfParser
 
     public function teksMentah(string $path): string
     {
-        return (new Parser())->parseFile($path)->getText();
+        return (new Parser)->parseFile($path)->getText();
     }
 
     /**
@@ -74,6 +74,7 @@ class MandiriPdfParser
 
             if (is_string($hasil)) {
                 $gagal[] = $hasil;
+
                 continue;
             }
 

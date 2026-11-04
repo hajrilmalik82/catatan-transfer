@@ -1,0 +1,123 @@
+name: Deploy
+
+# Mengirim aplikasi ke hosting setiap kali ada push ke main, tetapi hanya
+# setelah gaya kode dan tes lulus. Dapat juga dijalankan manual dari tab
+# Actions. Berkas .env dan database.sqlite tidak pernah ikut terkirim —
+# keduanya diunggah sekali secara manual lewat File Manager.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Dibangun memakai PHP 8.3, versi terendah yang didukung aplikasi ini.
+      # Hasilnya tetap berjalan di 8.5 yang dipakai hosting sekarang.
+      - name: Siapkan PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, curl, zip, gd, intl, sqlite3, bcmath
+          coverage: none
+
+      # Dibuat sebelum composer karena post-autoload-dump memanggil
+      # filament:upgrade, dan perintah itu perlu aplikasinya bisa menyala.
+      - name: Siapkan berkas lingkungan untuk pengujian
+        run: cp .env.example .env
+
+      - name: Pasang dependensi PHP
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Buat kunci aplikasi sementara
+        run: php artisan key:generate
+
+      - name: Periksa gaya kode
+        run: ./vendor/bin/pint --test
+
+      # Tes memakai SQLite :memory: (lihat phpunit.xml), jadi tidak menyentuh
+      # database sungguhan sama sekali.
+      - name: Jalankan tes
+        run: php artisan test
+
+      # Mulai dari sini barulah menyiapkan berkas yang benar-benar dikirim.
+      - name: Rakit ulang dependensi tanpa paket pengembangan
+        run: |
+          rm -rf vendor
+          composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+      # Aset Filament di-gitignore, jadi tidak ikut dalam checkout. Tanpa
+      # langkah ini panelnya naik tanpa CSS dan JS. composer sebenarnya sudah
+      # memanggilnya lewat filament:upgrade, ini sekadar jaring pengaman.
+      - name: Terbitkan aset Filament
+        run: php artisan filament:assets
+
+      - name: Siapkan Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Bangun aset tampilan
+        run: |
+          npm ci
+          npm run build
+
+      # Di hosting, isi folder public berada di public_html yang sejajar
+      # dengan catatan-app, sehingga jalurnya perlu disesuaikan.
+      - name: Sesuaikan jalur pada index.php
+        run: |
+          sed -i "s|__DIR__\.'/\.\./|__DIR__.'/../catatan-app/|g" public/index.php
+          grep -n "catatan-app" public/index.php
+
+      - name: Kirim folder publik
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./public/
+          server-dir: /domains/apk.hajrilmalik.web.id/public_html/
+          state-name: .ftp-deploy-public.json
+
+      - name: Kirim aplikasi
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./
+          server-dir: /domains/apk.hajrilmalik.web.id/catatan-app/
+          state-name: .ftp-deploy-app.json
+          # Yang tidak boleh ikut terkirim atau tersentuh sama sekali.
+          # Baris .env melindungi kunci aplikasi, dan baris database/*.sqlite*
+          # melindungi seluruh isi catatan transfer dari tertimpa tiap deploy.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            public/**
+            tests/**
+            .github/**
+            .env
+            .env.example
+            .editorconfig
+            phpunit.xml
+            package.json
+            package-lock.json
+            vite.config.js
+            storage/logs/*.log
+            storage/framework/cache/data/**
+            storage/framework/sessions/*
+            storage/framework/views/*.php
+            database/*.sqlite*

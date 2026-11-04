@@ -35,7 +35,7 @@ class RekapExcel
 
     public function simpanKe(string $path): void
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $this->sheet = $spreadsheet->getActiveSheet();
         $this->sheet->setTitle('Rekap Transfer');
 
@@ -175,27 +175,27 @@ class RekapExcel
 
         foreach ($this->data['dates'] as $tanggal) {
             $kunci = $tanggal->toDateString();
-            $sumberHariIni = $this->data['sumberPerTanggal'][$kunci] ?? [];
-            $jumlah = max(1, count($sumberHariIni));
+            $barisHariIni = $this->data['barisPerTanggal'][$kunci] ?? [];
+            $jumlah = max(1, count($barisHariIni));
             $awal = $baris;
 
-            if ($sumberHariIni === []) {
+            if ($barisHariIni === []) {
                 $this->sheet->setCellValue('A'.$baris, $tanggal->translatedFormat('d M Y'));
                 $this->sheet->setCellValue('B'.$baris, '-');
                 $baris++;
             } else {
-                foreach ($sumberHariIni as $i => $sumberId) {
+                foreach ($barisHariIni as $i => $isi) {
                     if ($i === 0) {
                         $this->sheet->setCellValue('A'.$baris, $tanggal->translatedFormat('d M Y'));
                     }
 
-                    $this->sheet->setCellValue('B'.$baris, $this->labelSumber($sumberId));
+                    $this->sheet->setCellValue('B'.$baris, $this->labelSumber($isi['sumberId'], $isi));
                     $this->sheet->getStyle('B'.$baris)->getAlignment()->setWrapText(true);
 
                     $kolom = 3;
 
                     foreach ($this->data['recipients'] as $penerima) {
-                        $nilai = $this->data['matrix'][$kunci][$sumberId][$penerima->id] ?? null;
+                        $nilai = $isi['nilai'][$penerima->id] ?? null;
 
                         if ($nilai !== null) {
                             $this->sheet->setCellValue($this->huruf($kolom).$baris, $nilai);
@@ -204,16 +204,12 @@ class RekapExcel
                         $kolom++;
                     }
 
-                    $this->sheet->setCellValue(
-                        $this->huruf($kolom).$baris,
-                        $this->data['totalPerSumber'][$kunci][$sumberId] ?? 0
-                    );
-
+                    $this->sheet->setCellValue($this->huruf($kolom).$baris, $isi['total']);
                     $baris++;
                 }
             }
 
-            // Tanggal dan total harian digabung menaungi seluruh batch hari itu.
+            // Tanggal dan total harian digabung menaungi seluruh baris hari itu.
             if ($jumlah > 1) {
                 $this->sheet->mergeCells('A'.$awal.':A'.($awal + $jumlah - 1));
                 $this->sheet->mergeCells($this->huruf($akhir).$awal.':'.$this->huruf($akhir).($awal + $jumlah - 1));
@@ -234,16 +230,22 @@ class RekapExcel
      * Nama rekening sumber dengan nomornya di baris kedua, ditulis lebih kecil
      * dan abu-abu seperti perlakuan pada kepala kolom penerima.
      */
-    private function labelSumber(int $sumberId): RichText|string
+    private function labelSumber(int $sumberId, array $isi): RichText|string
     {
         $nama = $this->data['namaSumber'][$sumberId] ?? '?';
         $nomor = $this->data['nomorSumber'][$sumberId] ?? null;
+
+        // Penanda urutan hanya dipasang kalau sumbernya dipakai lebih sekali
+        // pada hari yang sama.
+        if ($isi['jumlahSlot'] > 1) {
+            $nama .= ' #'.$isi['urut'];
+        }
 
         if (! $nomor) {
             return $nama;
         }
 
-        $teks = new RichText();
+        $teks = new RichText;
         $teks->createText($nama."\n");
         $teks->createTextRun($nomor)->getFont()->setSize(8)->getColor()->setARGB('FF6B7280');
 

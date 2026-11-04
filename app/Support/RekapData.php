@@ -43,36 +43,70 @@ class RekapData
             [$dari, $sampai] = [$sampai, $dari];
         }
 
-        $rows = Transaction::query()
+        $transaksi = Transaction::query()
             // Kolom tanggal ikut menyimpan jam, jadi perbandingannya memakai
             // whereDate; kalau tidak, transaksi di hari terakhir rentang luput.
             ->whereDate('tanggal', '>=', $dari->toDateString())
             ->whereDate('tanggal', '<=', $sampai->toDateString())
-            ->selectRaw('tanggal, source_account_id, recipient_id, SUM(nominal_transfer) as total')
-            ->groupBy('tanggal', 'source_account_id', 'recipient_id')
-            ->get();
+            ->orderBy('tanggal')
+            ->orderBy('source_account_id')
+            ->orderBy('id')
+            ->get(['id', 'tanggal', 'source_account_id', 'recipient_id', 'nominal_transfer']);
 
-        $matrix = [];
-        $sumberPerTanggal = [];
-        $totalPerSumber = [];
+        $slot = [];
         $dailyTotals = [];
         $recipientTotals = [];
         $grandTotal = 0;
 
-        foreach ($rows as $row) {
-            $key = Carbon::parse($row->tanggal)->toDateString();
-            $sumberId = $row->source_account_id;
-            $total = (int) $row->total;
+        foreach ($transaksi as $t) {
+            $kunci = Carbon::parse($t->tanggal)->toDateString();
+            $sumberId = $t->source_account_id;
+            $penerimaId = $t->recipient_id;
+            $nominal = (int) $t->nominal_transfer;
 
-            $matrix[$key][$sumberId][$row->recipient_id] = $total;
-            $totalPerSumber[$key][$sumberId] = ($totalPerSumber[$key][$sumberId] ?? 0) + $total;
-            $dailyTotals[$key] = ($dailyTotals[$key] ?? 0) + $total;
-            $recipientTotals[$row->recipient_id] = ($recipientTotals[$row->recipient_id] ?? 0) + $total;
-            $grandTotal += $total;
+            $slot[$kunci][$sumberId] ??= [];
+
+            // Tiap baris hanya boleh memuat satu nominal per penerima. Kalau
+            // orang yang sama menerima lagi di hari dan rekening sumber yang
+            // sama, nominalnya turun ke baris berikutnya, bukan dijumlahkan.
+            $masuk = false;
+
+            foreach ($slot[$kunci][$sumberId] as $i => $isi) {
+                if (! isset($isi['nilai'][$penerimaId])) {
+                    $slot[$kunci][$sumberId][$i]['nilai'][$penerimaId] = $nominal;
+                    $slot[$kunci][$sumberId][$i]['total'] += $nominal;
+                    $masuk = true;
+                    break;
+                }
+            }
+
+            if (! $masuk) {
+                $slot[$kunci][$sumberId][] = [
+                    'nilai' => [$penerimaId => $nominal],
+                    'total' => $nominal,
+                ];
+            }
+
+            $dailyTotals[$kunci] = ($dailyTotals[$kunci] ?? 0) + $nominal;
+            $recipientTotals[$penerimaId] = ($recipientTotals[$penerimaId] ?? 0) + $nominal;
+            $grandTotal += $nominal;
         }
 
-        foreach ($matrix as $key => $perSumber) {
-            $sumberPerTanggal[$key] = array_keys($perSumber);
+        // Diratakan jadi daftar baris per tanggal, siap ditampilkan.
+        $barisPerTanggal = [];
+
+        foreach ($slot as $kunci => $perSumber) {
+            foreach ($perSumber as $sumberId => $daftar) {
+                foreach ($daftar as $i => $isi) {
+                    $barisPerTanggal[$kunci][] = [
+                        'sumberId' => $sumberId,
+                        'urut' => $i + 1,
+                        'jumlahSlot' => count($daftar),
+                        'nilai' => $isi['nilai'],
+                        'total' => $isi['total'],
+                    ];
+                }
+            }
         }
 
         // Hanya tampilkan penerima yang benar-benar punya transaksi di periode
@@ -120,9 +154,7 @@ class RekapData
             'recipients' => $recipients,
             'namaSumber' => SourceAccount::pluck('nama', 'id'),
             'nomorSumber' => SourceAccount::pluck('nomor_rekening', 'id'),
-            'matrix' => $matrix,
-            'sumberPerTanggal' => $sumberPerTanggal,
-            'totalPerSumber' => $totalPerSumber,
+            'barisPerTanggal' => $barisPerTanggal,
             'dailyTotals' => $dailyTotals,
             'recipientTotals' => $recipientTotals,
             'grandTotal' => $grandTotal,

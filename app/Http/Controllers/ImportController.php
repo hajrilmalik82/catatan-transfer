@@ -114,6 +114,7 @@ class ImportController extends Controller
 
                 if ($pilihan === 'lewati') {
                     $dilewati++;
+
                     continue;
                 }
 
