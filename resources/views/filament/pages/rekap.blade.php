@@ -41,6 +41,20 @@
         .rk-tabel tfoot td { background: var(--rk-total); font-weight: 700; }
         .rk-harian { background: var(--rk-kepala); font-weight: 600; vertical-align: top; }
         .rk-kecil { display: block; font-size: .75rem; color: var(--rk-redup); }
+
+        @media (max-width: 640px) {
+            .rk-bar { padding: .5rem .625rem; gap: .5rem; }
+            .rk-kartu { gap: .5rem; margin-bottom: 1rem; }
+            .rk-kartu > div { padding: .625rem .75rem; }
+            .rk-kartu dt { font-size: .65rem; }
+            .rk-kartu dd { font-size: .95rem; }
+            .rk-tabel { font-size: .6875rem; line-height: 1.25; }
+            .rk-tabel th, .rk-tabel td { padding: .35rem .275rem; }
+            .rk-tabel thead th { white-space: normal; vertical-align: bottom; }
+            .rk-tabel thead th small, .rk-kecil { font-size: .5625rem; line-height: 1.15; word-break: break-all; }
+            .rk-beku { max-width: 3.25rem; white-space: normal; }
+            .rk-tabel tbody td:nth-child(2) { max-width: 5rem; }
+        }
     </style>
 
     <div class="rk">
