@@ -17,6 +17,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
@@ -40,39 +41,18 @@ class RecipientResource extends Resource
 
     private const MENU = 'penerima';
 
-    public static function shouldRegisterNavigation(): bool
+    public static function getAuthorizationResponse(string $action, ?Model $record = null): Response
     {
-        return auth()->user()?->bolehAkses(self::MENU) ?? false;
-    }
+        $aksi = match ($action) {
+            'create' => 'tambah',
+            'update' => 'ubah',
+            'delete', 'deleteAny', 'forceDelete', 'forceDeleteAny' => 'hapus',
+            default => 'lihat',
+        };
 
-    public static function canAccess(): bool
-    {
-        return auth()->user()?->bolehAkses(self::MENU) ?? false;
-    }
-
-    public static function canViewAny(): bool
-    {
-        return auth()->user()?->bolehAkses(self::MENU, 'lihat') ?? false;
-    }
-
-    public static function canCreate(): bool
-    {
-        return auth()->user()?->bolehAkses(self::MENU, 'tambah') ?? false;
-    }
-
-    public static function canEdit(Model $record): bool
-    {
-        return auth()->user()?->bolehAkses(self::MENU, 'ubah') ?? false;
-    }
-
-    public static function canDelete(Model $record): bool
-    {
-        return auth()->user()?->bolehAkses(self::MENU, 'hapus') ?? false;
-    }
-
-    public static function canDeleteAny(): bool
-    {
-        return auth()->user()?->bolehAkses(self::MENU, 'hapus') ?? false;
+        return (auth()->user()?->bolehAkses(self::MENU, $aksi) ?? false)
+            ? Response::allow()
+            : Response::deny();
     }
 
     public static function form(Schema $schema): Schema

@@ -16,6 +16,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v5
@@ -88,12 +89,14 @@ jobs:
           server-dir: /catatan-app/
           state-name: .ftp-deploy-app.json
           # Yang tidak boleh ikut terkirim atau tersentuh sama sekali.
-          # Baris .env melindungi kunci aplikasi, dan baris database/*.sqlite*
-          # melindungi seluruh isi catatan transfer dari tertimpa tiap deploy.
+          # Baris .env melindungi kunci aplikasi, database/*.sqlite* melindungi
+          # seluruh isi catatan transfer, dan vendor/** dilewati karena sudah
+          # diunggah lewat File Manager (21.000+ berkas membuat FTPS hosting macet).
           exclude: |
             **/.git*
             **/.git*/**
             **/node_modules/**
+            vendor/**
             public/**
             tests/**
             .github/**

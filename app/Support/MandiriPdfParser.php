@@ -142,13 +142,22 @@ class MandiriPdfParser
         return [
             'ref_transaksi' => $ref,
             'tanggal' => Carbon::createFromFormat('M j, Y', $tanggal)->toDateString(),
-            'nominal' => (int) round((float) str_replace(',', '', $nominal)),
+            'nominal' => $this->bersihkanNominal($nominal),
             'nomor_rekening' => $cocok[1],
             'nama' => $this->rapikanNama($cocok[2]),
             'bank' => $this->tebakBank($teks),
             'remark' => $this->ambilKeterangan($teks),
             'sumber_rekening' => $this->ambil($teks, '/(?:Sumber Dana|Source of Fund)\s*(\d{6,})/u'),
         ];
+    }
+
+    private function bersihkanNominal(string $nominal): int
+    {
+        // Buang desimal (.00 atau ,00) di ujung jika ada, lalu sisakan digitnya
+        // saja supaya pemisah ribuan titik maupun koma sama-sama terbaca.
+        $tanpaDesimal = preg_replace('/[.,]\d{1,2}$/u', '', trim($nominal));
+
+        return (int) preg_replace('/\D/u', '', $tanpaDesimal);
     }
 
     private function ambilKeterangan(string $teks): ?string

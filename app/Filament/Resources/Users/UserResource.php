@@ -16,6 +16,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
@@ -37,40 +38,18 @@ class UserResource extends Resource
 
     // Pengelolaan pengguna hanya untuk admin, bukan bagian dari hak akses
     // yang bisa diberikan ke staf.
-    public static function shouldRegisterNavigation(): bool
+    public static function getAuthorizationResponse(string $action, ?Model $record = null): Response
     {
-        return auth()->user()?->isAdmin() ?? false;
-    }
+        if (! (auth()->user()?->isAdmin() ?? false)) {
+            return Response::deny();
+        }
 
-    public static function canAccess(): bool
-    {
-        return auth()->user()?->isAdmin() ?? false;
-    }
-
-    public static function canViewAny(): bool
-    {
-        return static::canAccess();
-    }
-
-    public static function canCreate(): bool
-    {
-        return static::canAccess();
-    }
-
-    public static function canEdit(Model $record): bool
-    {
-        return static::canAccess();
-    }
-
-    public static function canDelete(Model $record): bool
-    {
         // Jangan sampai admin menghapus akunnya sendiri lalu terkunci di luar.
-        return static::canAccess() && $record->getKey() !== auth()->id();
-    }
+        if ($action === 'delete' && $record?->getKey() === auth()->id()) {
+            return Response::deny();
+        }
 
-    public static function canDeleteAny(): bool
-    {
-        return static::canAccess();
+        return Response::allow();
     }
 
     public static function form(Schema $schema): Schema

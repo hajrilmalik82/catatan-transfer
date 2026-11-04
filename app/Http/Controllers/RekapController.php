@@ -11,10 +11,12 @@ class RekapController extends Controller
 {
     public function export(Request $request, RekapData $rekap): BinaryFileResponse
     {
+        abort_unless($request->user()?->bolehAkses('rekap'), 403, 'Tidak punya hak akses ke menu rekap.');
+
         $data = $rekap->build($request);
 
         $nama = 'rekap-transfer-'.$data['dari']->format('Ymd').'-'.$data['sampai']->format('Ymd').'.xlsx';
-        $path = storage_path('app/'.$nama);
+        $path = storage_path('app/'.uniqid('rekap-transfer-', true).'.xlsx');
 
         (new RekapExcel($data))->simpanKe($path);
 

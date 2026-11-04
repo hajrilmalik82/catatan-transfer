@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('users', 'role')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table) {
             // 'admin' bebas mengakses semuanya, 'rekap' hanya halaman rekap.
             $table->string('role')->default('admin');

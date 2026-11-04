@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('users', 'permissions')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table) {
             // Bentuknya {"transaksi": ["lihat","tambah"], "rekap": ["lihat"]}.
             // Diabaikan untuk pengguna ber-role admin, yang selalu penuh.
