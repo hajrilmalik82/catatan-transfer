@@ -31,11 +31,11 @@
 
         .rk-gulung { --rk-skala: 1; overflow-x: auto; background: var(--rk-bg); border: 1px solid var(--rk-garis); border-radius: .5rem; }
         .rk-tabel { width: 100%; min-width: 100%; border-collapse: collapse; font-size: calc(.875rem * var(--rk-skala)); color: var(--rk-teks); }
-        .rk-tabel th, .rk-tabel td { padding: calc(.5rem * var(--rk-skala)) calc(.75rem * var(--rk-skala)); border-bottom: 1px solid var(--rk-garis); }
+        .rk-tabel th, .rk-tabel td { padding: calc(.5rem * var(--rk-skala)) calc(.75rem * var(--rk-skala)); border: 1px solid var(--rk-garis); }
         .rk-tabel thead th { background: var(--rk-kepala); text-align: left; font-weight: 600; white-space: nowrap; }
         .rk-tabel thead th small { display: block; font-size: calc(.75rem * var(--rk-skala)); font-weight: 400; color: var(--rk-redup); }
         .rk-kanan { text-align: right; white-space: nowrap; }
-        .rk-beku { position: sticky; left: 0; z-index: 1; background: var(--rk-bg); }
+        .rk-beku { position: sticky; left: 0; z-index: 1; background: var(--rk-bg); box-shadow: inset -1px 0 0 var(--rk-garis); }
         .rk-tabel thead .rk-beku { background: var(--rk-kepala); }
         .rk-nol { color: var(--rk-kosong); }
         .rk-tabel tfoot td { background: var(--rk-total); font-weight: 700; }
