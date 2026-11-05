@@ -130,19 +130,25 @@
         const promptTeks = `Baca seluruh halaman bukti transfer ini dan ubah menjadi JSON array murni (tanpa penjelasan tambahan) dengan format berikut:
 [
   {
-    "ref_transaksi": "ID Transaksi / Transaction ID (contoh: BIF38377118)",
+    "ref_transaksi": "ID Transaksi / Transaction ID (contoh: BIF38493462)",
     "tanggal": "YYYY-MM-DD",
-    "nominal": 1653500,
-    "sumber_rekening": "hanya digit nomor rekening pengirim / Sumber Dana / Sender Account (jika ada)",
-    "nomor_rekening": "hanya digit nomor rekening penerima (Beneficiary Account Number)",
-    "nama": "Nama penerima (Beneficiary Account Name)",
-    "bank": "Singkatan bank penerima: Mandiri / BNI / BRI / BSI / BCA / CIMB Niaga / Permata / Danamon / BTN / Lainnya",
-    "remark": "Isi Remark / Keterangan singkat"
+    "nominal": 3348220,
+    "sumber_rekening": "100055",
+    "nomor_rekening": "1100023403907",
+    "nama": "Herlina",
+    "bank": "Mandiri",
+    "remark": "Pembayaran BB Sayur Mayur"
   }
 ]
-Catatan:
-- "nominal" harus berupa angka bulat Rupiah (Transaction Amount yang dikirim, tanpa titik/koma/desimal).
-- Hanya masukkan transaksi yang berstatus Success / Sukses.`;
+Aturan wajib:
+1. "nominal": angka bulat Rupiah yang ditransfer (Transaction Amount / Jumlah Transfer, tanpa titik/koma/desimal, bukan Total Payment yang ditambah fee).
+2. "sumber_rekening":
+   - Jika nomor rekening pengirim (Sumber Dana) tampil utuh tanpa bintang *, ambil seluruh digit angkanya (contoh: "8102500303706").
+   - PENTING (Qlola BRI): Jika "Sender Account Number" disensor tanda bintang * (seperti "2943 **** **** 296" atau "**** **** **** 296"), JANGAN ambil angka dari baris yang disensor itu! Ambil angka kode di awal "Sender Account Debet" / "Sender Account Alias" / "Sender Account Name" (contoh: dari "100055 ECYIZLR1 Kemala Bhayang", isi dengan "100055").
+3. "nomor_rekening": hanya digit nomor rekening penerima (Beneficiary Account Number), tanpa spasi atau tanda strip.
+4. "bank": gunakan singkatan bersih: Mandiri / BNI / BRI / BSI / BCA / CIMB Niaga / Permata / Danamon / BTN / Lainnya.
+5. "remark": ambil inti keterangan pembayaran saja sebelum kata "tanggal ..." atau rincian perhitungan nominal/admin (contoh: dari "Pembayaran BB Perbumbuan tanggal 04 Nov 2026 Rp...", cukup tulis "Pembayaran BB Perbumbuan").
+6. Hanya masukkan transaksi yang berstatus Success / Sukses / Berhasil.`;
 
         btnPrompt?.addEventListener('click', async () => {
             try {
