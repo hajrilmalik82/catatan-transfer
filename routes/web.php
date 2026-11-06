@@ -13,6 +13,7 @@ Route::get('/login', fn () => redirect('/admin/login'))->name('login');
 
 Route::middleware('auth')->group(function () {
     Route::get('/rekap/export', [RekapController::class, 'export'])->name('rekap.export');
+    Route::get('/rekap/export/pdf', [RekapController::class, 'exportPdf'])->name('rekap.export.pdf');
 
     Route::middleware(BolehImport::class)->group(function () {
         Route::get('/import', [ImportController::class, 'form'])->name('import');

@@ -16,7 +16,7 @@
         .rk-tombol--mati { color: var(--rk-kosong); }
         .rk-aksi { border-radius: .375rem; padding: .5rem 1rem; font-size: .875rem; font-weight: 500;
                    color: #fff; border: 0; cursor: pointer; text-decoration: none; display: inline-block; }
-        .rk-aksi--biru { background: #2563eb; } .rk-aksi--hijau { background: #059669; }
+        .rk-aksi--biru { background: #2563eb; } .rk-aksi--hijau { background: #059669; } .rk-aksi--merah { background: #dc2626; }
         .rk-label { display: block; font-size: .75rem; font-weight: 500; color: var(--rk-redup); }
         .rk-input { margin-top: .25rem; border-radius: .375rem; border: 1px solid var(--rk-garis);
                     background: var(--rk-bg); color: var(--rk-teks); padding: .375rem .5rem; font-size: .875rem; }
@@ -110,6 +110,8 @@
             <button type="submit" class="rk-aksi rk-aksi--biru">Tampilkan</button>
             <a class="rk-aksi rk-aksi--hijau" id="rk-export"
                href="{{ route('rekap.export', request()->only('dari', 'sampai', 'minggu')) }}">Export Excel</a>
+            <a class="rk-aksi rk-aksi--merah" id="rk-export-pdf"
+               href="{{ route('rekap.export.pdf', request()->only('dari', 'sampai', 'minggu')) }}">Export PDF</a>
             <span id="rk-export-pesan" style="font-size:.75rem; color:var(--rk-redup)"></span>
         </form>
 
@@ -356,71 +358,75 @@
             });
         }
 
-        const tombol = document.getElementById('rk-export');
         const pesan = document.getElementById('rk-export-pesan');
-        if (! tombol) return;
-
-        const ua = navigator.userAgent;
-        const iOS = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
-        const layarPenuh = window.matchMedia('(display-mode: standalone)').matches
-            || navigator.standalone === true;
-
-        // Hanya iOS yang bermasalah dengan unduhan biasa. Browser lain
-        // dibiarkan memakai tautan seperti biasa.
-        if (! iOS && ! layarPenuh) return;
-
-        const namaDari = (header) => {
-            const cocok = (header || '').match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
-            return cocok ? decodeURIComponent(cocok[1]) : 'rekap-transfer.xlsx';
-        };
-
         const kabari = (teks) => { if (pesan) pesan.textContent = teks; };
 
-        tombol.addEventListener('click', async (e) => {
-            e.preventDefault();
+        const tanganiEkspor = (tombol, fallbackNama) => {
+            if (! tombol) return;
 
-            const semula = tombol.textContent;
-            tombol.textContent = 'Menyiapkan…';
-            tombol.style.pointerEvents = 'none';
-            kabari('');
+            const ua = navigator.userAgent;
+            const iOS = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+            const layarPenuh = window.matchMedia('(display-mode: standalone)').matches
+                || navigator.standalone === true;
 
-            try {
-                const res = await fetch(tombol.href, { credentials: 'same-origin' });
-                if (! res.ok) throw new Error('server membalas ' + res.status);
+            // Hanya iOS dan mode standalone yang bermasalah dengan unduhan biasa. Browser lain
+            // dibiarkan memakai tautan langsung seperti biasa.
+            if (! iOS && ! layarPenuh) return;
 
-                const blob = await res.blob();
-                const nama = namaDari(res.headers.get('Content-Disposition'));
-                const berkas = new File([blob], nama, { type: blob.type });
+            const namaDari = (header) => {
+                const cocok = (header || '').match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+                return cocok ? decodeURIComponent(cocok[1]) : fallbackNama;
+            };
 
-                if (navigator.canShare?.({ files: [berkas] })) {
-                    try {
-                        await navigator.share({ files: [berkas], title: nama });
-                        kabari('Berkas dikirim ke lembar Bagikan.');
-                        return;
-                    } catch (err) {
-                        if (err.name === 'AbortError') { kabari(''); return; }
-                        kabari('Lembar Bagikan ditolak, mencoba cara unduh biasa.');
+            tombol.addEventListener('click', async (e) => {
+                e.preventDefault();
+
+                const semula = tombol.textContent;
+                tombol.textContent = 'Menyiapkan…';
+                tombol.style.pointerEvents = 'none';
+                kabari('');
+
+                try {
+                    const res = await fetch(tombol.href, { credentials: 'same-origin' });
+                    if (! res.ok) throw new Error('server membalas ' + res.status);
+
+                    const blob = await res.blob();
+                    const nama = namaDari(res.headers.get('Content-Disposition'));
+                    const berkas = new File([blob], nama, { type: blob.type });
+
+                    if (navigator.canShare?.({ files: [berkas] })) {
+                        try {
+                            await navigator.share({ files: [berkas], title: nama });
+                            kabari('Berkas dikirim ke lembar Bagikan.');
+                            return;
+                        } catch (err) {
+                            if (err.name === 'AbortError') { kabari(''); return; }
+                            kabari('Lembar Bagikan ditolak, mencoba cara unduh biasa.');
+                        }
                     }
-                }
 
-                const alamat = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = alamat;
-                a.download = nama;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                setTimeout(() => URL.revokeObjectURL(alamat), 30000);
-                kabari('Berkas diunduh: ' + nama);
-            } catch (err) {
-                kabari('Gagal: ' + err.message);
-                alert('Gagal menyiapkan berkas: ' + err.message
-                    + '\n\nSebagai gantinya, buka halaman ini lewat Safari lalu unduh dari sana.');
-            } finally {
-                tombol.textContent = semula;
-                tombol.style.pointerEvents = '';
-            }
-        });
+                    const alamat = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = alamat;
+                    a.download = nama;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(alamat), 30000);
+                    kabari('Berkas diunduh: ' + nama);
+                } catch (err) {
+                    kabari('Gagal: ' + err.message);
+                    alert('Gagal menyiapkan berkas: ' + err.message
+                        + '\n\nSebagai gantinya, buka halaman ini lewat Safari lalu unduh dari sana.');
+                } finally {
+                    tombol.textContent = semula;
+                    tombol.style.pointerEvents = '';
+                }
+            });
+        };
+
+        tanganiEkspor(document.getElementById('rk-export'), 'rekap-transfer.xlsx');
+        tanganiEkspor(document.getElementById('rk-export-pdf'), 'rekap-transfer.pdf');
     })();
     </script>
 </x-filament-panels::page>
