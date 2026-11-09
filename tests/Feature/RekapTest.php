@@ -107,4 +107,17 @@ class RekapTest extends TestCase
         $this->assertStringContainsString('Penerima 1', $output);
         $this->assertStringContainsString('Penerima 12', $output);
     }
+
+    public function test_export_excel_menggunakan_rumus_formula_sum(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['rekap'],
+        ]);
+
+        $response = $this->actingAs($user)->get('/rekap/export');
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
 }

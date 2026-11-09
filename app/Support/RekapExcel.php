@@ -204,18 +204,31 @@ class RekapExcel
                         $kolom++;
                     }
 
-                    $this->sheet->setCellValue($this->huruf($kolom).$baris, $isi['total']);
+                    $kolomPenerimaAwal = $this->huruf(3);
+                    $kolomPenerimaAkhir = $this->huruf(2 + max(1, $this->data['recipients']->count()));
+
+                    if ($this->data['recipients']->isNotEmpty()) {
+                        $this->sheet->setCellValue($this->huruf($kolom).$baris, "=SUM({$kolomPenerimaAwal}{$baris}:{$kolomPenerimaAkhir}{$baris})");
+                    } else {
+                        $this->sheet->setCellValue($this->huruf($kolom).$baris, 0);
+                    }
                     $baris++;
                 }
             }
 
             // Tanggal dan total harian digabung menaungi seluruh baris hari itu.
+            $kolomTotalTransaksi = $this->huruf($akhir - 1);
             if ($jumlah > 1) {
                 $this->sheet->mergeCells('A'.$awal.':A'.($awal + $jumlah - 1));
                 $this->sheet->mergeCells($this->huruf($akhir).$awal.':'.$this->huruf($akhir).($awal + $jumlah - 1));
             }
 
-            $this->sheet->setCellValue($this->huruf($akhir).$awal, $this->data['dailyTotals'][$kunci] ?? 0);
+            if ($barisHariIni === []) {
+                $this->sheet->setCellValue($this->huruf($akhir).$awal, 0);
+            } else {
+                $barisAkhirHari = $awal + $jumlah - 1;
+                $this->sheet->setCellValue($this->huruf($akhir).$awal, "=SUM({$kolomTotalTransaksi}{$awal}:{$kolomTotalTransaksi}{$barisAkhirHari})");
+            }
 
             $this->sheet->getStyle('A'.$awal.':B'.($awal + $jumlah - 1))->getAlignment()
                 ->setVertical(Alignment::VERTICAL_CENTER);
@@ -255,6 +268,8 @@ class RekapExcel
     private function tulisTotal(int $baris): void
     {
         $akhir = $this->kolomTerakhir();
+        $awalIsi = $this->barisAwalIsi;
+        $barisSebelumTotal = max($awalIsi, $baris - 1);
 
         // Hanya sejajar kolom Tanggal; kolom Transaksi dibiarkan kosong.
         $this->sheet->setCellValue('A'.$baris, 'TOTAL PER ORANG');
@@ -262,15 +277,19 @@ class RekapExcel
         $kolom = 3;
 
         foreach ($this->data['recipients'] as $penerima) {
+            $hurufKolom = $this->huruf($kolom);
             $this->sheet->setCellValue(
-                $this->huruf($kolom).$baris,
-                $this->data['recipientTotals'][$penerima->id] ?? 0
+                $hurufKolom.$baris,
+                "=SUM({$hurufKolom}{$awalIsi}:{$hurufKolom}{$barisSebelumTotal})"
             );
             $kolom++;
         }
 
-        $this->sheet->setCellValue($this->huruf($kolom).$baris, $this->data['grandTotal']);
-        $this->sheet->setCellValue($this->huruf($kolom + 1).$baris, $this->data['grandTotal']);
+        $hurufTotalTx = $this->huruf($kolom);
+        $hurufTotalHarian = $this->huruf($kolom + 1);
+
+        $this->sheet->setCellValue($hurufTotalTx.$baris, "=SUM({$hurufTotalTx}{$awalIsi}:{$hurufTotalTx}{$barisSebelumTotal})");
+        $this->sheet->setCellValue($hurufTotalHarian.$baris, "=SUM({$hurufTotalHarian}{$awalIsi}:{$hurufTotalHarian}{$barisSebelumTotal})");
 
         $totalRange = 'A'.$baris.':'.$this->huruf($akhir).$baris;
         $this->warnai($totalRange, self::BIRU_MUDA);
