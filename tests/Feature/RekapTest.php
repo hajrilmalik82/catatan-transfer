@@ -14,37 +14,34 @@ class RekapTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_tamu_tidak_bisa_mengakses_export_pdf(): void
+    public function test_publik_bisa_mengakses_halaman_rekap_tanpa_login(): void
     {
-        $response = $this->get('/rekap/export/pdf');
-
-        $response->assertRedirect('/login');
-    }
-
-    public function test_user_tanpa_izin_rekap_ditolak(): void
-    {
-        $user = User::factory()->create([
-            'role' => 'operator',
-            'permissions' => [],
-        ]);
-
-        $response = $this->actingAs($user)->get('/rekap/export/pdf');
-
-        $response->assertForbidden();
-    }
-
-    public function test_user_dengan_izin_bisa_mengunduh_pdf(): void
-    {
-        $user = User::factory()->create([
-            'role' => 'admin',
-            'permissions' => ['rekap'],
-        ]);
-
-        $response = $this->actingAs($user)->get('/rekap/export/pdf');
+        $response = $this->get('/rekap');
 
         $response->assertOk();
-        $response->assertHeader('Content-Type', 'application/pdf');
-        $this->assertStringStartsWith('%PDF-1.4', $response->streamedContent());
+        $response->assertSee('Rekap Transfer');
+        $response->assertSee('Publik');
+    }
+
+    public function test_publik_bisa_mengunduh_pdf_dan_excel_tanpa_login(): void
+    {
+        $responsePdf = $this->get('/rekap/export/pdf');
+        $responsePdf->assertOk();
+        $responsePdf->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-1.4', $responsePdf->streamedContent());
+
+        $responseExcel = $this->get('/rekap/export');
+        $responseExcel->assertOk();
+        $responseExcel->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+
+    public function test_filter_tanggal_pada_halaman_publik(): void
+    {
+        $response = $this->get('/rekap?dari=2026-11-02&sampai=2026-11-08');
+
+        $response->assertOk();
+        $response->assertSee('2026-11-02');
+        $response->assertSee('2026-11-08');
     }
 
     public function test_generator_pdf_menghasilkan_dokumen_valid(): void

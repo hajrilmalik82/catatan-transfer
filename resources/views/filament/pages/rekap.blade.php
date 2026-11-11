@@ -112,6 +112,8 @@
                href="{{ route('rekap.export', request()->only('dari', 'sampai', 'minggu')) }}">Export Excel</a>
             <a class="rk-aksi rk-aksi--merah" id="rk-export-pdf"
                href="{{ route('rekap.export.pdf', request()->only('dari', 'sampai', 'minggu')) }}">Export PDF</a>
+            <a class="rk-aksi" style="background:#475569"
+               href="{{ route('rekap.public', request()->only('dari', 'sampai', 'minggu')) }}" target="_blank">Tampilan Publik ↗</a>
             <span id="rk-export-pesan" style="font-size:.75rem; color:var(--rk-redup)"></span>
         </form>
 

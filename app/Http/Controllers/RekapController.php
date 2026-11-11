@@ -5,15 +5,22 @@ namespace App\Http\Controllers;
 use App\Support\RekapData;
 use App\Support\RekapExcel;
 use App\Support\RekapPdf;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class RekapController extends Controller
 {
+    /**
+     * Tampilan publik rekapan transfer (hanya lihat, tanpa login).
+     */
+    public function public(Request $request, RekapData $rekap): View
+    {
+        return view('rekap-public', $rekap->build($request));
+    }
+
     public function export(Request $request, RekapData $rekap): BinaryFileResponse
     {
-        abort_unless($request->user()?->bolehAkses('rekap'), 403, 'Tidak punya hak akses ke menu rekap.');
-
         $data = $rekap->build($request);
 
         $nama = 'rekap-transfer-'.$data['dari']->format('Ymd').'-'.$data['sampai']->format('Ymd').'.xlsx';
@@ -31,8 +38,6 @@ class RekapController extends Controller
 
     public function exportPdf(Request $request, RekapData $rekap): BinaryFileResponse
     {
-        abort_unless($request->user()?->bolehAkses('rekap'), 403, 'Tidak punya hak akses ke menu rekap.');
-
         $data = $rekap->build($request);
 
         $nama = 'rekap-transfer-'.$data['dari']->format('Ymd').'-'.$data['sampai']->format('Ymd').'.pdf';
