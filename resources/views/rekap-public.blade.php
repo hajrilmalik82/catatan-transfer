@@ -300,9 +300,6 @@
                 <h1 class="rk-judul">Rekap Transfer</h1>
                 <span class="rk-badge">Publik &bull; Hanya Lihat</span>
             </div>
-            <div>
-                <a href="{{ url('/admin') }}" class="rk-tombol" style="font-size:.8125rem">Login Admin &rarr;</a>
-            </div>
         </header>
 
         @php
