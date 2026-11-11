@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Setting;
 use App\Models\User;
 use App\Support\RekapData;
 use App\Support\RekapPdf;
@@ -42,6 +43,35 @@ class RekapTest extends TestCase
         $response->assertOk();
         $response->assertSee('2026-11-02');
         $response->assertSee('2026-11-08');
+    }
+
+    public function test_tampilan_publik_ditolak_jika_dinonaktifkan(): void
+    {
+        Setting::set('rekap_publik_aktif', false);
+
+        $response = $this->get('/rekap');
+        $response->assertForbidden();
+        $response->assertSee('Tampilan Publik Dinonaktifkan');
+
+        $responseExcel = $this->get('/rekap/export');
+        $responseExcel->assertForbidden();
+
+        $responsePdf = $this->get('/rekap/export/pdf');
+        $responsePdf->assertForbidden();
+    }
+
+    public function test_admin_tetap_dapat_melihat_preview_saat_publik_dinonaktifkan(): void
+    {
+        Setting::set('rekap_publik_aktif', false);
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'permissions' => ['rekap'],
+        ]);
+
+        $response = $this->actingAs($admin)->get('/rekap');
+        $response->assertOk();
+        $response->assertSee('DINONAKTIFKAN');
     }
 
     public function test_generator_pdf_menghasilkan_dokumen_valid(): void

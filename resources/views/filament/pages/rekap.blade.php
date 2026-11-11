@@ -114,6 +114,15 @@
                href="{{ route('rekap.export.pdf', request()->only('dari', 'sampai', 'minggu')) }}">Export PDF</a>
             <a class="rk-aksi" style="background:#475569"
                href="{{ route('rekap.public', request()->only('dari', 'sampai', 'minggu')) }}" target="_blank">Tampilan Publik ↗</a>
+            @if (! empty($publikAktif))
+                <span title="Tampilan publik aktif" style="display:inline-flex; align-items:center; gap:.35rem; font-size:.8125rem; font-weight:600; color:#059669; padding:.375rem .625rem; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:.375rem">
+                    <span style="width:7px; height:7px; border-radius:50%; background:#059669"></span> Publik Aktif
+                </span>
+            @else
+                <span title="Tampilan publik dinonaktifkan" style="display:inline-flex; align-items:center; gap:.35rem; font-size:.8125rem; font-weight:600; color:#dc2626; padding:.375rem .625rem; background:#fef2f2; border:1px solid #fecaca; border-radius:.375rem">
+                    <span style="width:7px; height:7px; border-radius:50%; background:#dc2626"></span> Publik Nonaktif
+                </span>
+            @endif
             <span id="rk-export-pesan" style="font-size:.75rem; color:var(--rk-redup)"></span>
         </form>
 

@@ -302,6 +302,12 @@
             </div>
         </header>
 
+        @if (empty($publikAktif))
+            <div style="background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:.75rem 1rem; border-radius:.5rem; margin-bottom:1rem; font-size:.875rem">
+                <strong>Perhatian:</strong> Tampilan publik saat ini sedang <strong>DINONAKTIFKAN</strong> bagi pengunjung umum. Anda dapat melihat halaman ini karena sedang login sebagai administrator.
+            </div>
+        @endif
+
         @php
             $sebelum = $senin->copy()->subWeek();
             $sesudah = $senin->copy()->addWeek();

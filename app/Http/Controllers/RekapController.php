@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use App\Support\RekapData;
 use App\Support\RekapExcel;
 use App\Support\RekapPdf;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class RekapController extends Controller
@@ -14,13 +15,30 @@ class RekapController extends Controller
     /**
      * Tampilan publik rekapan transfer (hanya lihat, tanpa login).
      */
-    public function public(Request $request, RekapData $rekap): View
+    public function public(Request $request, RekapData $rekap): Response
     {
-        return view('rekap-public', $rekap->build($request));
+        $aktif = Setting::get('rekap_publik_aktif', true);
+
+        if (! $aktif) {
+            // Admin yang sedang login dan punya izin rekap tetap dapat melihat preview
+            if ($request->user()?->bolehAkses('rekap')) {
+                return response()->view('rekap-public', array_merge($rekap->build($request), ['publikAktif' => false]));
+            }
+
+            return response()->view('rekap-disabled', [], 403);
+        }
+
+        return response()->view('rekap-public', array_merge($rekap->build($request), ['publikAktif' => true]));
     }
 
     public function export(Request $request, RekapData $rekap): BinaryFileResponse
     {
+        $aktif = Setting::get('rekap_publik_aktif', true);
+
+        if (! $aktif && ! $request->user()?->bolehAkses('rekap')) {
+            abort(403, 'Tampilan publik sedang dinonaktifkan.');
+        }
+
         $data = $rekap->build($request);
 
         $nama = 'rekap-transfer-'.$data['dari']->format('Ymd').'-'.$data['sampai']->format('Ymd').'.xlsx';
@@ -38,6 +56,12 @@ class RekapController extends Controller
 
     public function exportPdf(Request $request, RekapData $rekap): BinaryFileResponse
     {
+        $aktif = Setting::get('rekap_publik_aktif', true);
+
+        if (! $aktif && ! $request->user()?->bolehAkses('rekap')) {
+            abort(403, 'Tampilan publik sedang dinonaktifkan.');
+        }
+
         $data = $rekap->build($request);
 
         $nama = 'rekap-transfer-'.$data['dari']->format('Ymd').'-'.$data['sampai']->format('Ymd').'.pdf';
