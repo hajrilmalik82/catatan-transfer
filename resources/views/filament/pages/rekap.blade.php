@@ -112,10 +112,6 @@
                href="{{ route('rekap.export', request()->only('dari', 'sampai', 'minggu')) }}">Export Excel</a>
             <a class="rk-aksi rk-aksi--merah" id="rk-export-pdf"
                href="{{ route('rekap.export.pdf', request()->only('dari', 'sampai', 'minggu')) }}">Export PDF</a>
-            <button type="button" class="rk-aksi" style="background: #0f766e;"
-               onclick="navigator.clipboard.writeText('{{ route('rekap.sync', array_merge(request()->only('dari', 'sampai', 'minggu'), ['token' => config('catatan.sync_token')])) }}'); alert('Tautan Sinkronisasi Google Sheets telah disalin ke clipboard! Masukkan ke rumus =IMPORTHTML(url, &quot;table&quot;, 1) di Spreadsheet Anda.');">
-                Salin Link Spreadsheet
-            </button>
             <span id="rk-export-pesan" style="font-size:.75rem; color:var(--rk-redup)"></span>
         </form>
 

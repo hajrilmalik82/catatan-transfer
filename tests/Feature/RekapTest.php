@@ -120,17 +120,4 @@ class RekapTest extends TestCase
         $response->assertOk();
         $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }
-
-    public function test_sync_spreadsheet_memerlukan_token_valid(): void
-    {
-        $response = $this->get('/rekap/sync');
-        $response->assertForbidden();
-
-        $tokenSalah = $this->get('/rekap/sync?token=token-salah');
-        $tokenSalah->assertForbidden();
-
-        $tokenBenar = $this->get('/rekap/sync?token='.config('catatan.sync_token'));
-        $tokenBenar->assertOk();
-        $tokenBenar->assertSee('<table', false);
-    }
 }

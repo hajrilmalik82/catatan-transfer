@@ -41,12 +41,4 @@ return [
         'ubah' => 'Ubah',
         'hapus' => 'Hapus',
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Token Sinkronisasi Spreadsheet
-    |--------------------------------------------------------------------------
-    | Token rahasia agar Google Spreadsheet dapat mengakses data rekap tanpa login.
-    */
-    'sync_token' => env('REKAP_SYNC_TOKEN', 'catatan-transfer-sync-secret'),
 ];
