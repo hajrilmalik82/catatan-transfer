@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/admin');
 
+// Endpoint publik khusus sinkronisasi Google Spreadsheet dengan proteksi token
+Route::get('/rekap/sync', [RekapController::class, 'sync'])->name('rekap.sync');
+
 // Middleware auth mengarahkan tamu ke route bernama 'login'; satu-satunya
 // halaman login di aplikasi ini milik panel Filament.
 Route::get('/login', fn () => redirect('/admin/login'))->name('login');

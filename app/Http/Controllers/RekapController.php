@@ -45,4 +45,16 @@ class RekapController extends Controller
             'Content-Disposition' => 'attachment; filename="'.$nama.'"',
         ])->deleteFileAfterSend();
     }
+
+    public function sync(Request $request, RekapData $rekap)
+    {
+        $validToken = config('catatan.sync_token');
+        abort_if(! $validToken || $request->query('token') !== $validToken, 403, 'Token sinkronisasi tidak valid.');
+
+        $data = $rekap->build($request);
+
+        return response()
+            ->view('rekap-table', $data)
+            ->header('Content-Type', 'text/html; charset=UTF-8');
+    }
 }
