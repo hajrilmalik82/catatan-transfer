@@ -7,6 +7,7 @@ use App\Models\SourceAccount;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * Menyiapkan data rekap. Dipakai bersama oleh halaman rekap di panel dan
@@ -168,5 +169,106 @@ class RekapData
             'hariTerisi' => $hariTerisi,
             'rataHarian' => $hariTerisi > 0 ? (int) round($grandTotal / $hariTerisi) : 0,
         ];
+    }
+
+    /**
+     * Menentukan kolom penerima mana saja yang perlu ditandai kosong pada satu baris.
+     *
+     * Baris lanjutan (urut > 1) dilewati karena hanya menampung slot transfer tambahan,
+     * sedangkan slot #1 sudah memuat seluruh penerima yang mendapat transfer dari
+     * sumber tersebut. Penerima dengan nama yang sama dikelompokkan: selama minimal
+     * satu rekening bernama sama terisi pada baris tersebut, seluruh kelompok aman.
+     *
+     * @param  array<string, mixed>  $baris
+     * @return array<int|string, bool>
+     */
+    public static function penerimaKosongPadaBaris(array $baris, Collection $recipients): array
+    {
+        if (($baris['urut'] ?? 1) > 1) {
+            return [];
+        }
+
+        $nilai = $baris['nilai'] ?? [];
+
+        $namaAda = [];
+        foreach ($recipients as $penerima) {
+            if (($nilai[$penerima->id] ?? null) !== null) {
+                $namaAda[self::normalisasiNama($penerima->nama)] = true;
+            }
+        }
+
+        $kosong = [];
+        foreach ($recipients as $penerima) {
+            if (! isset($namaAda[self::normalisasiNama($penerima->nama)])) {
+                $kosong[$penerima->id] = true;
+            }
+        }
+
+        return $kosong;
+    }
+
+    /**
+     * Menyusun daftar keterangan transaksi kosong untuk ditampilkan di bawah tabel
+     * pada export Excel maupun PDF. Penerima bernama sama yang semuanya kosong pada
+     * satu baris cukup dicatat satu kali.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<int, array{nama: string, tanggal: string, sumber: string, teks: string}>
+     */
+    public static function daftarKosong(array $data): array
+    {
+        $recipients = $data['recipients'] ?? collect();
+        if (count($recipients) === 0) {
+            return [];
+        }
+
+        $dates = $data['dates'] ?? [];
+        $barisPerTanggal = $data['barisPerTanggal'] ?? [];
+        $namaSumber = $data['namaSumber'] ?? [];
+
+        $daftar = [];
+
+        foreach ($dates as $tanggal) {
+            $kunci = $tanggal->toDateString();
+            $barisHariIni = $barisPerTanggal[$kunci] ?? [];
+
+            foreach ($barisHariIni as $baris) {
+                $kosongIds = self::penerimaKosongPadaBaris($baris, $recipients);
+                if ($kosongIds === []) {
+                    continue;
+                }
+
+                $sumber = (string) ($namaSumber[$baris['sumberId']] ?? '?');
+                $tglLabel = $tanggal->translatedFormat('d M Y');
+                $sudahNama = [];
+
+                foreach ($recipients as $penerima) {
+                    if (! isset($kosongIds[$penerima->id])) {
+                        continue;
+                    }
+
+                    $kunciNama = self::normalisasiNama($penerima->nama);
+                    if (isset($sudahNama[$kunciNama])) {
+                        continue;
+                    }
+                    $sudahNama[$kunciNama] = true;
+
+                    $nama = trim((string) $penerima->nama);
+                    $daftar[] = [
+                        'nama' => $nama,
+                        'tanggal' => $tglLabel,
+                        'sumber' => $sumber,
+                        'teks' => sprintf('Kosong pada %s tanggal %s dari %s', $nama, $tglLabel, $sumber),
+                    ];
+                }
+            }
+        }
+
+        return $daftar;
+    }
+
+    private static function normalisasiNama(?string $nama): string
+    {
+        return mb_strtolower((string) preg_replace('/\s+/', ' ', trim((string) $nama)));
     }
 }

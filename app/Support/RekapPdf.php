@@ -43,6 +43,10 @@ class RekapPdf
 
     private const C_ZEBRA = [0.976, 0.980, 0.984];       // #F9FAFB (belang baris)
 
+    private const C_ORANGE_BG = [0.996, 0.843, 0.667];   // #FED7AA (sel kosong ditandai)
+
+    private const C_ORANGE_TEXT = [0.604, 0.204, 0.071]; // #9A3412 (tanda - pada sel oren)
+
     private float $pageW = self::A4_W;
 
     private array $pages = [];
@@ -196,6 +200,8 @@ class RekapPdf
                     }
                     $this->drawText($namaSumber, self::MARGIN_L + $wTanggal + 5, $rowY + 12, 8, 'F2', self::C_DARK_TEXT);
 
+                    $kosongIds = RekapData::penerimaKosongPadaBaris($baris, $recipients);
+
                     $curX = self::MARGIN_L + $wTanggal + $wTransaksi;
                     foreach ($recipients as $rec) {
                         $nilai = $baris['nilai'][$rec->id] ?? null;
@@ -206,6 +212,9 @@ class RekapPdf
                                 $fontSize = 7.0;
                             }
                             $this->drawText($teksNilai, $curX + $wRecip - 5, $rowY + 12, $fontSize, 'F1', self::C_DARK_TEXT, 'R');
+                        } elseif (isset($kosongIds[$rec->id])) {
+                            $this->drawRect($curX, $rowY, $wRecip, $rowH, self::C_ORANGE_BG, self::C_GRAY_BORDER);
+                            $this->drawText('-', $curX + ($wRecip / 2), $rowY + 12, 8, 'F2', self::C_ORANGE_TEXT, 'C');
                         } else {
                             $this->drawText('-', $curX + ($wRecip / 2), $rowY + 12, 8, 'F1', self::C_GRAY_BORDER, 'C');
                         }
@@ -266,6 +275,71 @@ class RekapPdf
         $curX += $wTotalTx;
         $this->drawLine($curX, $y, $curX, $y + $totalH, self::C_GRAY_BORDER);
         $this->drawText($teksGrand, $curX + $wTotalHarian - 5, $y + 13, 8.5, 'F2', self::C_NAVY, 'R');
+
+        $this->renderCatatanKosong($y + $totalH + 14.0);
+    }
+
+    private function renderCatatanKosong(float $y): void
+    {
+        $daftar = RekapData::daftarKosong($this->data);
+
+        if ($daftar === []) {
+            return;
+        }
+
+        $usableW = $this->pageW - self::MARGIN_L - self::MARGIN_R;
+        $maxY = self::A4_H - self::MARGIN_B - 26.0;
+        $headerH = 18.0;
+        $itemH = 14.0;
+
+        $cols = ($usableW >= 650.0 && count($daftar) > 1) ? 2 : 1;
+        $colW = $usableW / $cols;
+
+        $tulisJudulCatatan = function (float $topY, string $judul) use ($usableW, $headerH): float {
+            $this->drawRect(self::MARGIN_L, $topY, $usableW, $headerH, self::C_ORANGE_BG, self::C_GRAY_BORDER);
+            $this->drawText($judul, self::MARGIN_L + 6, $topY + 12, 8, 'F2', self::C_ORANGE_TEXT);
+
+            return $topY + $headerH;
+        };
+
+        if ($y + $headerH + $itemH > $maxY) {
+            $this->addPage();
+            $y = $this->renderHeader(false) + 4.0;
+        }
+
+        $y = $tulisJudulCatatan($y, 'CATATAN TRANSAKSI KOSONG ('.count($daftar).')');
+
+        foreach (array_chunk($daftar, $cols) as $baris) {
+            if ($y + $itemH > $maxY) {
+                $this->addPage();
+                $y = $this->renderHeader(false) + 4.0;
+                $y = $tulisJudulCatatan($y, 'CATATAN TRANSAKSI KOSONG (Lanjutan)');
+            }
+
+            $this->drawRect(self::MARGIN_L, $y, $usableW, $itemH, self::C_WHITE, self::C_GRAY_BORDER);
+
+            foreach ($baris as $kolIdx => $item) {
+                $xTeks = self::MARGIN_L + ($kolIdx * $colW) + 6;
+                $teks = $this->fitText('- '.$item['teks'], 7.5, $colW - 12);
+                $this->drawText($teks, $xTeks, $y + 10, 7.5, 'F1', self::C_DARK_TEXT);
+            }
+
+            $y += $itemH;
+        }
+    }
+
+    private function fitText(string $text, float $size, float $maxWidth): string
+    {
+        if ($this->measureText($text, $size) <= $maxWidth) {
+            return $text;
+        }
+
+        $truncated = $text;
+        while (strlen($truncated) > 3 && $this->measureText($truncated.'..', $size) > $maxWidth) {
+            $truncated = substr($truncated, 0, -1);
+        }
+
+        return $truncated.'..';
     }
 
     private function renderTableHeader(float $y, Collection $recipients, float $wTgl, float $wTx, float $wRecip, float $wTotalTx, float $wTotalHarian, float $h): void

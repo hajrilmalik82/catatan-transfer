@@ -26,6 +26,8 @@ class RekapExcel
 
     private const ABU = 'FFF3F4F6';
 
+    private const OREN_KOSONG = 'FFFED7AA';
+
     private Worksheet $sheet;
 
     private int $barisAwalIsi = 0;
@@ -46,6 +48,7 @@ class RekapExcel
         $this->barisAwalIsi = $baris;
         $baris = $this->tulisIsi($baris);
         $this->tulisTotal($baris);
+        $this->tulisCatatanKosong($baris + 2);
 
         $this->rapikanKolom();
         // Hanya kolom Tanggal yang dikunci; Transaksi ikut bergeser bersama
@@ -192,13 +195,17 @@ class RekapExcel
                     $this->sheet->setCellValue('B'.$baris, $this->labelSumber($isi['sumberId'], $isi));
                     $this->sheet->getStyle('B'.$baris)->getAlignment()->setWrapText(true);
 
+                    $kosongIds = RekapData::penerimaKosongPadaBaris($isi, $this->data['recipients']);
                     $kolom = 3;
 
                     foreach ($this->data['recipients'] as $penerima) {
                         $nilai = $isi['nilai'][$penerima->id] ?? null;
+                        $sel = $this->huruf($kolom).$baris;
 
                         if ($nilai !== null) {
-                            $this->sheet->setCellValue($this->huruf($kolom).$baris, $nilai);
+                            $this->sheet->setCellValue($sel, $nilai);
+                        } elseif (isset($kosongIds[$penerima->id])) {
+                            $this->warnai($sel, self::OREN_KOSONG);
                         }
 
                         $kolom++;
@@ -306,6 +313,39 @@ class RekapExcel
         $this->warnai($this->huruf($akhir).$awalIsi.':'.$this->huruf($akhir).($baris - 1), self::ABU);
         $this->sheet->getStyle($this->huruf($akhir - 1).$awalIsi.':'.$this->huruf($akhir).$baris)
             ->getFont()->setBold(true);
+    }
+
+    private function tulisCatatanKosong(int $baris): void
+    {
+        $daftar = RekapData::daftarKosong($this->data);
+
+        if ($daftar === []) {
+            return;
+        }
+
+        $akhir = $this->kolomTerakhir();
+        $judulRange = $this->rentang(1, $akhir, $baris);
+
+        $this->sheet->setCellValue('A'.$baris, 'CATATAN TRANSAKSI KOSONG ('.count($daftar).')');
+        $this->sheet->mergeCells($judulRange);
+        $this->warnai($judulRange, self::OREN_KOSONG);
+        $this->sheet->getStyle('A'.$baris)->getFont()->setBold(true)->setSize(10)
+            ->getColor()->setARGB('FF9A3412');
+        $this->sheet->getStyle('A'.$baris)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $this->garis($judulRange);
+        $this->sheet->getRowDimension($baris)->setRowHeight(20);
+        $baris++;
+
+        foreach ($daftar as $item) {
+            $barisRange = $this->rentang(1, $akhir, $baris);
+            $this->sheet->setCellValue('A'.$baris, '• '.$item['teks']);
+            $this->sheet->mergeCells($barisRange);
+            $this->sheet->getStyle('A'.$baris)->getFont()->setSize(9.5)
+                ->getColor()->setARGB('FF374151');
+            $this->sheet->getStyle('A'.$baris)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $this->garis($barisRange);
+            $baris++;
+        }
     }
 
     private function rapikanKolom(): void
