@@ -14,6 +14,8 @@
             --rk-kepala: #f1f5f9;
             --rk-total: #dbeafe;
             --rk-kosong: #cbd5e1;
+            --rk-oren-bg: #fed7aa;
+            --rk-oren-teks: #9a3412;
             --rk-biru: #2563eb;
             --rk-hijau: #059669;
             --rk-merah: #dc2626;
@@ -29,6 +31,8 @@
                 --rk-kepala: #0f172a;
                 --rk-total: #1e3a8a;
                 --rk-kosong: #475569;
+                --rk-oren-bg: #7c2d12;
+                --rk-oren-teks: #fed7aa;
             }
         }
 
@@ -220,6 +224,33 @@
         }
         .rk-tabel thead .rk-beku { background: var(--rk-kepala); }
         .rk-nol { color: var(--rk-kosong); }
+        .rk-kosong-sel { background: var(--rk-oren-bg); color: var(--rk-oren-teks); font-weight: 600; }
+        .rk-catatan {
+            margin-top: 1rem;
+            background: var(--rk-bg);
+            border: 1px solid var(--rk-garis);
+            border-radius: .5rem;
+            overflow: hidden;
+        }
+        .rk-catatan-judul {
+            margin: 0;
+            padding: .5rem .875rem;
+            background: var(--rk-oren-bg);
+            color: var(--rk-oren-teks);
+            font-size: .8125rem;
+            font-weight: 700;
+            border-bottom: 1px solid var(--rk-garis);
+        }
+        .rk-catatan-daftar {
+            margin: 0;
+            padding: .75rem 1rem;
+            list-style: disc inside;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+            gap: .25rem 1.25rem;
+            font-size: .8125rem;
+            color: var(--rk-teks);
+        }
         .rk-tabel tfoot td { background: var(--rk-total); font-weight: 700; }
         .rk-harian { background: var(--rk-kepala); font-weight: 600; vertical-align: top; }
         .rk-kecil {
@@ -369,106 +400,7 @@
             @endforeach
         </dl>
 
-        @if ($recipients->isEmpty())
-            <div class="rk-gulung" style="padding:2rem; text-align:center; color:var(--rk-redup)">
-                Belum ada transaksi pada rentang tanggal ini.
-            </div>
-        @else
-            <div class="rk-zoom">
-                <span>Ukuran tabel:</span>
-                <button type="button" id="rk-zoom-kurang" title="Perkecil">&minus;</button>
-                <button type="button" id="rk-zoom-reset" title="Kembalikan ke ukuran semula">100%</button>
-                <button type="button" id="rk-zoom-tambah" title="Perbesar">+</button>
-            </div>
-            <div class="rk-gulung" id="rk-gulung">
-                <table class="rk-tabel">
-                    <thead>
-                        <tr>
-                            <th class="rk-beku">Tanggal</th>
-                            <th>Transaksi</th>
-                            @foreach ($recipients as $penerima)
-                                <th class="rk-kanan">{{ $penerima->nama }}<small>{{ $penerima->bank }} {{ $penerima->nomor_rekening }}</small></th>
-                            @endforeach
-                            <th class="rk-kanan">Total per Transaksi</th>
-                            <th class="rk-kanan">Total Harian</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($dates as $tanggal)
-                            @php
-                                $kunci = $tanggal->toDateString();
-                                $barisHariIni = $barisPerTanggal[$kunci] ?? [];
-                                $jumlahBaris = max(1, count($barisHariIni));
-                            @endphp
-
-                            @if ($barisHariIni === [])
-                                <tr class="rk-nol">
-                                    <td class="rk-beku">{{ $tanggal->translatedFormat('d M Y') }}</td>
-                                    <td>-</td>
-                                    @foreach ($recipients as $penerima)<td class="rk-kanan">-</td>@endforeach
-                                    <td class="rk-kanan">-</td>
-                                    <td class="rk-kanan">-</td>
-                                </tr>
-                            @else
-                                @foreach ($barisHariIni as $i => $baris)
-                                    <tr>
-                                        @if ($i === 0)
-                                            <td class="rk-beku" rowspan="{{ $jumlahBaris }}" style="vertical-align:top">
-                                                {{ $tanggal->translatedFormat('d M Y') }}
-                                            </td>
-                                        @endif
-                                        <td>
-                                            {{ $namaSumber[$baris['sumberId']] ?? '?' }}
-                                            @if ($baris['jumlahSlot'] > 1)
-                                                <strong>#{{ $baris['urut'] }}</strong>
-                                            @endif
-                                            @if ($nomorSumber[$baris['sumberId']] ?? null)
-                                                <span class="rk-kecil">{{ $nomorSumber[$baris['sumberId']] }}</span>
-                                            @endif
-                                        </td>
-                                        @foreach ($recipients as $penerima)
-                                            @php
-                                                $nilai = $baris['nilai'][$penerima->id] ?? null;
-                                                $rincian = $baris['info'][$penerima->id] ?? null;
-                                            @endphp
-                                            <td class="rk-kanan {{ $nilai ? 'rk-ada' : 'rk-nol' }}"
-                                                @if ($nilai)
-                                                    data-penerima="{{ $penerima->nama }}"
-                                                    data-tanggal="{{ $tanggal->translatedFormat('d M Y') }}"
-                                                    data-remark="{{ $rincian['remark'] ?? '' }}"
-                                                    data-ref="{{ $rincian['ref'] ?? '' }}"
-                                                @endif>
-                                                {{ $nilai ? number_format($nilai, 0, ',', '.') : '-' }}
-                                            </td>
-                                        @endforeach
-                                        <td class="rk-kanan" style="font-weight:600">
-                                            {{ number_format($baris['total'], 0, ',', '.') }}
-                                        </td>
-                                        @if ($i === 0)
-                                            <td class="rk-kanan rk-harian" rowspan="{{ $jumlahBaris }}">
-                                                {{ number_format($dailyTotals[$kunci] ?? 0, 0, ',', '.') }}
-                                            </td>
-                                        @endif
-                                    </tr>
-                                @endforeach
-                            @endif
-                        @endforeach
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td class="rk-beku">TOTAL PER ORANG</td>
-                            <td></td>
-                            @foreach ($recipients as $penerima)
-                                <td class="rk-kanan">{{ number_format($recipientTotals[$penerima->id] ?? 0, 0, ',', '.') }}</td>
-                            @endforeach
-                            <td class="rk-kanan">{{ number_format($grandTotal, 0, ',', '.') }}</td>
-                            <td class="rk-kanan">{{ number_format($grandTotal, 0, ',', '.') }}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-            <div id="rk-info" class="rk-info"></div>
-        @endif
+        @include('partials.rekap-tabel')
     </div>
 
     <script>

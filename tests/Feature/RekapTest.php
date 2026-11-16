@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Recipient;
 use App\Models\Setting;
+use App\Models\SourceAccount;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Support\RekapData;
 use App\Support\RekapExcel;
@@ -290,5 +293,69 @@ class RekapTest extends TestCase
         $this->assertStringContainsString('0.996 0.843 0.667 rg', $pdfOutput);
         $this->assertStringContainsString('CATATAN TRANSAKSI KOSONG \\(1\\)', $pdfOutput);
         $this->assertStringContainsString('Kosong pada Ervan tanggal 09 Nov 2026 dari Merangin \\(Mandiri\\)', $pdfOutput);
+    }
+
+    public function test_tampilan_rekap_publik_dan_admin_menandai_sel_kosong_dan_catatan(): void
+    {
+        $spn = SourceAccount::create(['nama' => 'SPN (BRI Qlola)', 'nomor_rekening' => '100055', 'aktif' => true]);
+        $merangin = SourceAccount::create(['nama' => 'Merangin (Mandiri)', 'nomor_rekening' => '81025', 'aktif' => true]);
+
+        $ervanBni = Recipient::create(['nama' => 'Ervan', 'bank' => 'BNI', 'nomor_rekening' => '111', 'aktif' => true]);
+        $ervanMandiri = Recipient::create(['nama' => 'Ervan', 'bank' => 'Mandiri', 'nomor_rekening' => '222', 'aktif' => true]);
+        $khavy = Recipient::create(['nama' => 'Khavy Arsyadi', 'bank' => 'Mandiri', 'nomor_rekening' => '333', 'aktif' => true]);
+
+        // SPN 9 Nov: Ervan BNI ada (Ervan Mandiri aman), Khavy ada
+        Transaction::create([
+            'tanggal' => '2026-11-09',
+            'source_account_id' => $spn->id,
+            'recipient_id' => $ervanBni->id,
+            'nominal_tagihan' => 2717500,
+            'biaya_admin' => 0,
+        ]);
+        Transaction::create([
+            'tanggal' => '2026-11-09',
+            'source_account_id' => $spn->id,
+            'recipient_id' => $khavy->id,
+            'nominal_tagihan' => 1561500,
+            'biaya_admin' => 0,
+        ]);
+
+        // Merangin 9 Nov: hanya Khavy ada -> kedua Ervan kosong (ditandai & dicatat 1x)
+        Transaction::create([
+            'tanggal' => '2026-11-09',
+            'source_account_id' => $merangin->id,
+            'recipient_id' => $khavy->id,
+            'nominal_tagihan' => 832500,
+            'biaya_admin' => 0,
+        ]);
+
+        // SPN 10 Nov: Ervan Mandiri & Khavy ada agar kedua kolom Ervan tampil di periode ini
+        Transaction::create([
+            'tanggal' => '2026-11-10',
+            'source_account_id' => $spn->id,
+            'recipient_id' => $ervanMandiri->id,
+            'nominal_tagihan' => 2557500,
+            'biaya_admin' => 0,
+        ]);
+        Transaction::create([
+            'tanggal' => '2026-11-10',
+            'source_account_id' => $spn->id,
+            'recipient_id' => $khavy->id,
+            'nominal_tagihan' => 1642500,
+            'biaya_admin' => 0,
+        ]);
+
+        $resPublik = $this->get('/rekap?dari=2026-11-09&sampai=2026-11-10');
+        $resPublik->assertOk();
+        $resPublik->assertSee('rk-kosong-sel');
+        $resPublik->assertSee('Catatan Transaksi Kosong (1)');
+        $resPublik->assertSee('Kosong pada Ervan tanggal 09 Nov 2026 dari Merangin (Mandiri)');
+
+        $admin = User::factory()->create(['role' => 'admin', 'permissions' => ['rekap']]);
+        $resAdmin = $this->actingAs($admin)->get('/admin/rekap?dari=2026-11-09&sampai=2026-11-10');
+        $resAdmin->assertOk();
+        $resAdmin->assertSee('rk-kosong-sel');
+        $resAdmin->assertSee('Catatan Transaksi Kosong (1)');
+        $resAdmin->assertSee('Kosong pada Ervan tanggal 09 Nov 2026 dari Merangin (Mandiri)');
     }
 }
